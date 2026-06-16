@@ -7,6 +7,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0 Beta1] — 2026-06-16
+
+### Added
+
+- **`render_pagination`** — data-driven input mode: accepts `XoopsPageNav`'s native `total`, `limit`, and
+  `start` (offset) values and computes the page count and current page itself, with a `{start}` URL
+  placeholder for offset-based links. The existing `totalPages` / `currentPage` + `{page}` mode is retained
+  for backward compatibility. Standard XOOPS list pages (which paginate through `XoopsPageNav`) can now adopt
+  the plugin without restructuring their controllers.
+- **`render_pagination`** — opt-in `window` parameter: when greater than `0`, renders the first and last
+  pages plus the current page ± `window` neighbours with ellipses instead of every page link (default `0`
+  preserves the show-all behaviour), making the plugin a practical replacement for `XoopsPageNav` on large
+  result sets.
+- **`RenderPaginationTest`** — covers the data-driven mode, `{start}` offset links, the backward-compatible
+  page mode, single-page suppression, assign mode, and href escaping.
+
+### Changed
+
+- **`render_qr_code`** — now generates the QR code locally via `chillerlan/php-qrcode` (v5/v6 API: inline
+  SVG data-URI, no external request, no GD requirement), removing the privacy and availability dependency on
+  the external goqr.me web service. The external API remains only as a last-resort fallback if the library is
+  ever unavailable at runtime. The library is loaded from the host project's autoloader, or from the plugin's
+  own bundled `vendor/` when the host does not autoload it.
+- **`composer.json`** — `chillerlan/php-qrcode` (`^5.0 || ^6.0`) promoted to `require` (local QR is now the
+  default).
+
 ### Fixed
 
 - **`SecurityExtensionTest`**: Correct stale `sanitizeFilename` assertion — `image<>|?.jpg` now correctly expects `image.jpg` (dot preserved by allowlist) not `imagejpg`. Test renamed to `sanitizeFilenameRemovesSpecialCharsButPreservesDot` with inline pipeline walkthrough.

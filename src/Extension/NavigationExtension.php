@@ -222,41 +222,78 @@ final class NavigationExtension extends AbstractExtension
     /**
      * Render Bootstrap 5 pagination controls.
      *
-     * @param array  $params   ['totalPages' => int, 'currentPage' => int, 'urlPattern' => string, 'assign' => string]
+     * Two input modes (S1 — XOOPS compatibility):
+     *  - Data-driven (preferred for XOOPS): pass XoopsPageNav's native values
+     *    ['total' => int, 'limit' => int, 'start' => int(offset)]. totalPages and
+     *    the current page are computed from them. Use the {start} placeholder in
+     *    urlPattern for offset-based links (how XoopsPageNav paginates), e.g.
+     *    urlPattern="index.php?start={start}".
+     *  - Page-based (BC): ['totalPages' => int, 'currentPage' => int] with a
+     *    {page} placeholder, e.g. urlPattern="?page={page}".
+     *
+     * @param array  $params   ['total','limit','start'] or ['totalPages','currentPage'] + ['urlPattern','assign']
      * @param object $template Smarty_Internal_Template|Smarty\Template
      */
     public function renderPagination(array $params, object $template): string
     {
-        $totalPages = (int) ($params['totalPages'] ?? 1);
-        $currentPage = (int) ($params['currentPage'] ?? 1);
+        $limitForUrl = 1;
+
+        if (isset($params['total'], $params['limit'])) {
+            // XoopsPageNav-style: total rows + per-page limit (+ start offset).
+            $total = \max(0, (int) $params['total']);
+            $limitForUrl = \max(1, (int) $params['limit']);
+            $start = \max(0, (int) ($params['start'] ?? 0));
+            $totalPages = (int) \ceil($total / $limitForUrl);
+            $currentPage = (int) \floor($start / $limitForUrl) + 1;
+        } else {
+            $totalPages = (int) ($params['totalPages'] ?? 1);
+            $currentPage = (int) ($params['currentPage'] ?? 1);
+        }
+
         $urlPattern = $params['urlPattern'] ?? '?page={page}';
+        $window = \max(0, (int) ($params['window'] ?? 0));
+        $totalPages = \max(1, $totalPages);
+        $currentPage = \max(1, \min($currentPage, $totalPages));
 
         if ($totalPages <= 1) {
             return '';
         }
 
+        // Build a link for a 1-based page number, supporting both {page} and {start}.
+        $makeUrl = static function (int $pageNum) use ($urlPattern, $limitForUrl): string {
+            $replaced = \str_replace(
+                ['{page}', '{start}'],
+                [(string) $pageNum, (string) (($pageNum - 1) * $limitForUrl)],
+                $urlPattern,
+            );
+
+            return \htmlspecialchars($replaced, ENT_QUOTES, 'UTF-8');
+        };
+
         $html = '<nav aria-label="Page navigation"><ul class="pagination">';
 
         // Previous button
         if ($currentPage > 1) {
-            $prevUrl = \htmlspecialchars(\str_replace('{page}', (string) ($currentPage - 1), $urlPattern), ENT_QUOTES, 'UTF-8');
-            $html .= '<li class="page-item"><a class="page-link" href="' . $prevUrl . '" aria-label="Previous">&laquo;</a></li>';
+            $html .= '<li class="page-item"><a class="page-link" href="' . $makeUrl($currentPage - 1) . '" aria-label="Previous">&laquo;</a></li>';
         } else {
             $html .= '<li class="page-item disabled"><span class="page-link">&laquo;</span></li>';
         }
 
-        // Page numbers
-        for ($i = 1; $i <= $totalPages; $i++) {
-            $url = \htmlspecialchars(\str_replace('{page}', (string) $i, $urlPattern), ENT_QUOTES, 'UTF-8');
+        // Page numbers (optionally windowed with first/last + ellipses when $window > 0)
+        foreach (self::pageList($currentPage, $totalPages, $window) as $i) {
+            if ($i === 0) {
+                $html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+                continue;
+            }
+
             $activeClass = $i === $currentPage ? ' active' : '';
             $ariaCurrent = $i === $currentPage ? ' aria-current="page"' : '';
-            $html .= '<li class="page-item' . $activeClass . '"' . $ariaCurrent . '><a class="page-link" href="' . $url . '">' . $i . '</a></li>';
+            $html .= '<li class="page-item' . $activeClass . '"' . $ariaCurrent . '><a class="page-link" href="' . $makeUrl($i) . '">' . $i . '</a></li>';
         }
 
         // Next button
         if ($currentPage < $totalPages) {
-            $nextUrl = \htmlspecialchars(\str_replace('{page}', (string) ($currentPage + 1), $urlPattern), ENT_QUOTES, 'UTF-8');
-            $html .= '<li class="page-item"><a class="page-link" href="' . $nextUrl . '" aria-label="Next">&raquo;</a></li>';
+            $html .= '<li class="page-item"><a class="page-link" href="' . $makeUrl($currentPage + 1) . '" aria-label="Next">&raquo;</a></li>';
         } else {
             $html .= '<li class="page-item disabled"><span class="page-link">&raquo;</span></li>';
         }
@@ -272,22 +309,70 @@ final class NavigationExtension extends AbstractExtension
     }
 
     /**
-     * Render a QR code image tag using the goqr.me API.
+     * Build the list of page numbers to render.
+     *
+     * window <= 0 (default): every page 1..total (unchanged behavior).
+     * window > 0: first + last + current ± window, with 0 used as an ellipsis
+     * marker — so large XOOPS result sets paginate like XoopsPageNav instead of
+     * dumping hundreds of links.
+     *
+     * @return array<int> page numbers, with 0 marking an ellipsis
+     */
+    private static function pageList(int $current, int $total, int $window): array
+    {
+        if ($window <= 0 || $total <= ($window * 2 + 3)) {
+            return \range(1, $total);
+        }
+
+        $pages = [1];
+        $from = \max(2, $current - $window);
+        $to = \min($total - 1, $current + $window);
+
+        if ($from > 2) {
+            $pages[] = 0; // leading ellipsis
+        }
+
+        for ($i = $from; $i <= $to; $i++) {
+            $pages[] = $i;
+        }
+
+        if ($to < $total - 1) {
+            $pages[] = 0; // trailing ellipsis
+        }
+
+        $pages[] = $total;
+
+        return $pages;
+    }
+
+    /**
+     * Render a QR code image tag (S5).
+     *
+     * Generates the QR code LOCALLY via chillerlan/php-qrcode when that library is
+     * installed (an inline SVG data-URI — no external request, no privacy leak,
+     * works without GD). Falls back to the external goqr.me API only when the
+     * library is absent, so behaviour never breaks before the dependency lands.
      *
      * @param array  $params   ['text' => string, 'size' => int, 'assign' => string]
      * @param object $template Smarty_Internal_Template|Smarty\Template
      */
     public function renderQrCode(array $params, object $template): string
     {
-        $text = $params['text'] ?? '';
+        $text = (string) ($params['text'] ?? '');
         $size = (int) ($params['size'] ?? 150);
 
         if ($text === '') {
             return '';
         }
 
-        $encodedText = \urlencode($text);
-        $html = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . $encodedText . '" alt="QR Code" width="' . $size . '" height="' . $size . '" loading="lazy">';
+        $src = self::localQrDataUri($text, $size);
+
+        if ($src === null) {
+            // Fallback: external API (only when chillerlan/php-qrcode is not installed).
+            $src = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . \urlencode($text);
+        }
+
+        $html = '<img src="' . \htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="QR Code" width="' . $size . '" height="' . $size . '" loading="lazy">';
 
         if (!empty($params['assign'])) {
             $template->assign($params['assign'], $html);
@@ -295,6 +380,47 @@ final class NavigationExtension extends AbstractExtension
         }
 
         return $html;
+    }
+
+    /**
+     * Generate a local, dependency-light inline-SVG data-URI QR code.
+     *
+     * @return string|null data-URI on success, or null when chillerlan/php-qrcode is unavailable.
+     */
+    private static function localQrDataUri(string $text, int $size): ?string
+    {
+        // The QR generator (chillerlan/php-qrcode) may be provided by the host
+        // project's top-level autoloader OR bundled in this package's own vendor/.
+        // If it isn't already visible, load the bundled autoload once when present.
+        if (!\class_exists(\chillerlan\QRCode\QRCode::class)) {
+            $bundled = \dirname(__DIR__, 2) . '/vendor/autoload.php';
+
+            if (\is_file($bundled)) {
+                require_once $bundled;
+            }
+        }
+
+        if (!\class_exists(\chillerlan\QRCode\QRCode::class) || !\class_exists(\chillerlan\QRCode\QROptions::class)) {
+            return null;
+        }
+
+        try {
+            // chillerlan/php-qrcode v5/v6 API: SVG markup output, base64 data-URI.
+            $options = new \chillerlan\QRCode\QROptions([
+                'outputInterface'      => \chillerlan\QRCode\Output\QRMarkupSVG::class,
+                'outputBase64'         => true,
+                'eccLevel'             => \chillerlan\QRCode\Common\EccLevel::M,
+                'scale'                => \max(1, \intdiv($size, 25)),
+                'svgUseFillAttributes' => false,
+            ]);
+
+            // With outputBase64 = true, render() returns a data:image/svg+xml;base64,... URI.
+            $dataUri = (new \chillerlan\QRCode\QRCode($options))->render($text);
+
+            return \is_string($dataUri) && $dataUri !== '' ? $dataUri : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
