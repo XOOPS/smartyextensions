@@ -19,19 +19,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`render_pagination`** — opt-in `window` parameter: when greater than `0`, renders the first and last
   pages plus the current page ± `window` neighbours with ellipses instead of every page link (default `0`
   preserves the show-all behaviour), making the plugin a practical replacement for `XoopsPageNav` on large
-  result sets.
-- **`RenderPaginationTest`** — covers the data-driven mode, `{start}` offset links, the backward-compatible
-  page mode, single-page suppression, assign mode, and href escaping.
+  result sets. A single-page gap is rendered as the page number rather than an ellipsis (`1 2 3`, not `1 … 3`).
+- **`RenderPaginationTest`** / **`RenderQrCodeTest`** — cover the data-driven mode, `{start}` offset links, the
+  backward-compatible page mode, single-page suppression (incl. clearing an `assign`ed variable), assign mode,
+  href escaping, the windowed ellipsis behaviour, and local-vs-external QR output with size clamping.
 
 ### Changed
 
 - **`render_qr_code`** — now generates the QR code locally via `chillerlan/php-qrcode` (v5/v6 API: inline
-  SVG data-URI, no external request, no GD requirement), removing the privacy and availability dependency on
-  the external goqr.me web service. The external API remains only as a last-resort fallback if the library is
-  ever unavailable at runtime. The library is loaded from the host project's autoloader, or from the plugin's
-  own bundled `vendor/` when the host does not autoload it.
-- **`composer.json`** — `chillerlan/php-qrcode` (`^5.0 || ^6.0`) promoted to `require` (local QR is now the
-  default).
+  SVG data-URI, no external request, no GD requirement). **The external service is no longer used by default**:
+  a failed/absent local generator now yields no image rather than silently sending the QR payload to a third
+  party. Pass `externalFallback=true` to opt back into the external API. The `size` is clamped to 32–1024 px.
+  The library is loaded from the host project's autoloader, or once from the plugin's own bundled `vendor/`
+  when the host does not autoload it.
+- **`render_pagination`** — clears the `assign`ed template variable on a single-page early return, so stale
+  pagination from a previous loop iteration is not left behind.
+- **`composer.json`** — `chillerlan/php-qrcode` (`^5.0 || ^6.0`) promoted to `require`. **Behaviour change:**
+  consumers using only the non-QR plugins now also pull this dependency; it makes local QR the default.
 
 ### Fixed
 

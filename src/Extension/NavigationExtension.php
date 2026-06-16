@@ -16,6 +16,12 @@ use Xoops\SmartyExtensions\AbstractExtension;
  */
 final class NavigationExtension extends AbstractExtension
 {
+    /**
+     * External QR-code service used only as an explicit opt-in fallback
+     * (render_qr_code externalFallback=true) when local generation is unavailable.
+     */
+    private const QR_FALLBACK_API = 'https://api.qrserver.com/v1/create-qr-code/';
+
     public function getFunctions(): array
     {
         return [
@@ -250,12 +256,18 @@ final class NavigationExtension extends AbstractExtension
             $currentPage = (int) ($params['currentPage'] ?? 1);
         }
 
-        $urlPattern = $params['urlPattern'] ?? '?page={page}';
+        $urlPattern = (string) ($params['urlPattern'] ?? '?page={page}');
         $window = \max(0, (int) ($params['window'] ?? 0));
         $totalPages = \max(1, $totalPages);
         $currentPage = \max(1, \min($currentPage, $totalPages));
 
         if ($totalPages <= 1) {
+            // Clear any assigned variable so a one-page result doesn't leave stale
+            // pagination from a previous iteration in loops/blocks.
+            if (!empty($params['assign'])) {
+                $template->assign($params['assign'], '');
+            }
+
             return '';
         }
 
@@ -328,6 +340,14 @@ final class NavigationExtension extends AbstractExtension
         $from = \max(2, $current - $window);
         $to = \min($total - 1, $current + $window);
 
+        // Avoid a single-page gap rendered as an ellipsis ("1 … 3" reads worse than "1 2 3").
+        if ($from === 3) {
+            $from = 2;
+        }
+        if ($to === $total - 2) {
+            $to = $total - 1;
+        }
+
         if ($from > 2) {
             $pages[] = 0; // leading ellipsis
         }
@@ -348,18 +368,20 @@ final class NavigationExtension extends AbstractExtension
     /**
      * Render a QR code image tag (S5).
      *
-     * Generates the QR code LOCALLY via chillerlan/php-qrcode when that library is
-     * installed (an inline SVG data-URI — no external request, no privacy leak,
-     * works without GD). Falls back to the external goqr.me API only when the
-     * library is absent, so behaviour never breaks before the dependency lands.
+     * Generates the QR code LOCALLY via chillerlan/php-qrcode (an inline SVG
+     * data-URI — no external request, no privacy leak, works without GD). The
+     * external service is NOT used by default: pass externalFallback=true to allow
+     * it only when local generation is unavailable (otherwise an unavailable local
+     * generator yields no image rather than silently leaking the payload off-site).
      *
-     * @param array  $params   ['text' => string, 'size' => int, 'assign' => string]
+     * @param array  $params   ['text' => string, 'size' => int, 'externalFallback' => bool, 'assign' => string]
      * @param object $template Smarty_Internal_Template|Smarty\Template
      */
     public function renderQrCode(array $params, object $template): string
     {
         $text = (string) ($params['text'] ?? '');
-        $size = (int) ($params['size'] ?? 150);
+        // Clamp to a scannable-yet-sane pixel range.
+        $size = \max(32, \min(1024, (int) ($params['size'] ?? 150)));
 
         if ($text === '') {
             return '';
@@ -367,9 +389,12 @@ final class NavigationExtension extends AbstractExtension
 
         $src = self::localQrDataUri($text, $size);
 
+        if ($src === null && !empty($params['externalFallback'])) {
+            $src = self::QR_FALLBACK_API . '?size=' . $size . 'x' . $size . '&data=' . \rawurlencode($text);
+        }
+
         if ($src === null) {
-            // Fallback: external API (only when chillerlan/php-qrcode is not installed).
-            $src = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . \urlencode($text);
+            return '';
         }
 
         $html = '<img src="' . \htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="QR Code" width="' . $size . '" height="' . $size . '" loading="lazy">';
@@ -389,10 +414,13 @@ final class NavigationExtension extends AbstractExtension
      */
     private static function localQrDataUri(string $text, int $size): ?string
     {
-        // The QR generator (chillerlan/php-qrcode) may be provided by the host
-        // project's top-level autoloader OR bundled in this package's own vendor/.
-        // If it isn't already visible, load the bundled autoload once when present.
-        if (!\class_exists(\chillerlan\QRCode\QRCode::class)) {
+        // chillerlan/php-qrcode is a hard dependency, normally provided by the host
+        // project's autoloader. As a fallback for bundled/zip distributions, load the
+        // package's own vendor/ autoloader at most once if the class isn't visible yet.
+        static $autoloadAttempted = false;
+
+        if (!$autoloadAttempted && !\class_exists(\chillerlan\QRCode\QRCode::class)) {
+            $autoloadAttempted = true;
             $bundled = \dirname(__DIR__, 2) . '/vendor/autoload.php';
 
             if (\is_file($bundled)) {
@@ -410,7 +438,7 @@ final class NavigationExtension extends AbstractExtension
                 'outputInterface'      => \chillerlan\QRCode\Output\QRMarkupSVG::class,
                 'outputBase64'         => true,
                 'eccLevel'             => \chillerlan\QRCode\Common\EccLevel::M,
-                'scale'                => \max(1, \intdiv($size, 25)),
+                'scale'                => \max(3, \intdiv($size, 25)),
                 'svgUseFillAttributes' => false,
             ]);
 

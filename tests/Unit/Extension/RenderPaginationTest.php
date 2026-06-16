@@ -182,4 +182,93 @@ final class RenderPaginationTest extends TestCase
         $this->assertStringContainsString('href="?a=1&amp;page=3">3</a>', $result);
         $this->assertStringNotContainsString('href="?a=1&page=3"', $result);
     }
+
+    // ── Windowed mode (window param + ellipses) ─────────────
+
+    #[Test]
+    public function windowedModeRendersEllipsesWithFirstLastAndNeighbours(): void
+    {
+        // 200 rows / 10 = 20 pages; start=90 => current page 10; window=2.
+        $result = $this->ext->renderPagination(
+            ['total' => 200, 'limit' => 10, 'start' => 90, 'window' => 2, 'urlPattern' => 'p.php?start={start}'],
+            $this->template(),
+        );
+
+        $this->assertStringContainsString('&hellip;', $result);   // ellipsis present
+        $this->assertStringContainsString('>1</a>', $result);     // first
+        $this->assertStringContainsString('>20</a>', $result);    // last
+        $this->assertStringContainsString('>8</a>', $result);     // current - window
+        $this->assertStringContainsString('>12</a>', $result);    // current + window
+        $this->assertStringNotContainsString('>5</a>', $result);  // outside window, hidden
+        $this->assertStringNotContainsString('>15</a>', $result); // outside window, hidden
+    }
+
+    #[Test]
+    public function windowedModeOmitsLeadingEllipsisWhenCurrentNearStart(): void
+    {
+        // current page 1 of 20, window=2 => pages 1,2,3 … 20 (no leading ellipsis).
+        $result = $this->ext->renderPagination(
+            ['total' => 200, 'limit' => 10, 'start' => 0, 'window' => 2, 'urlPattern' => 'p.php?start={start}'],
+            $this->template(),
+        );
+
+        $this->assertStringContainsString('>2</a>', $result);          // page 2 shown, not collapsed
+        $this->assertStringContainsString('>3</a>', $result);
+        $this->assertStringContainsString('>20</a>', $result);
+        $this->assertSame(1, \substr_count($result, '&hellip;'));      // trailing ellipsis only
+    }
+
+    #[Test]
+    public function windowedModeOmitsTrailingEllipsisWhenCurrentNearEnd(): void
+    {
+        // current page 20 of 20, window=2 => 1 … 18,19,20 (no trailing ellipsis).
+        $result = $this->ext->renderPagination(
+            ['total' => 200, 'limit' => 10, 'start' => 190, 'window' => 2, 'urlPattern' => 'p.php?start={start}'],
+            $this->template(),
+        );
+
+        $this->assertStringContainsString('>18</a>', $result);
+        $this->assertStringContainsString('>19</a>', $result);
+        $this->assertSame(1, \substr_count($result, '&hellip;'));      // leading ellipsis only
+    }
+
+    #[Test]
+    public function windowedModeShowsSinglePageInsteadOfEllipsisGap(): void
+    {
+        // current page 5, window=2 => the leading gap is just page 2, so render
+        // "1 2 3 4 5 …" rather than "1 … 3 4 5 …".
+        $result = $this->ext->renderPagination(
+            ['total' => 200, 'limit' => 10, 'start' => 40, 'window' => 2, 'urlPattern' => 'p.php?start={start}'],
+            $this->template(),
+        );
+
+        $this->assertStringContainsString('>2</a>', $result);          // single gap shown as page 2
+        $this->assertSame(1, \substr_count($result, '&hellip;'));      // only the trailing ellipsis
+    }
+
+    #[Test]
+    public function singlePageWithAssignClearsTheTemplateVariable(): void
+    {
+        // One page total + assign => empty output AND the variable explicitly cleared.
+        $template = new class implements TemplateStub {
+            /** @var array<string, mixed> */
+            public array $assigned = [];
+
+            public function assign(string $name, mixed $value = null): void
+            {
+                $this->assigned[$name] = $value;
+            }
+
+            public function getTemplateVars(?string $name = null): mixed
+            {
+                return $this->assigned;
+            }
+        };
+
+        $result = $this->ext->renderPagination(['total' => 5, 'limit' => 10, 'assign' => 'nav'], $template);
+
+        $this->assertSame('', $result);
+        $this->assertArrayHasKey('nav', $template->assigned);
+        $this->assertSame('', $template->assigned['nav']);
+    }
 }
