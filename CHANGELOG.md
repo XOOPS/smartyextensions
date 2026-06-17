@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0 Beta2] — 2026-06-16
+
 ### Added
 
 - **`render_breadcrumbs`** (S2) — also accepts the XOOPS-native list of records
@@ -23,6 +25,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`YYYY-MM-DD[ T]HH:MM[:SS]`) are parsed and reformatted; any other string is treated as an
   already-formatted display value (e.g. XOOPS `formatTimestamp` output) and returned **unchanged**
   rather than re-parsed and corrupted.
+
+### Infrastructure
+
+- **`phpstan-baseline.neon`** — deduplicated: the prefer-lowest/prefer-stable matrix baseline was a raw
+  concatenation of both legs (every common error stored twice, ~317 entries); it is now a block-deduplicated
+  union (163 entries, roughly half the size). No source or behaviour change.
 
 ## [1.3.0 Beta1] — 2026-06-16
 
