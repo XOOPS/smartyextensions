@@ -397,7 +397,7 @@ final class NavigationExtension extends AbstractExtension
             return '';
         }
 
-        $html = '<img src="' . \htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="QR Code" width="' . $size . '" height="' . $size . '" loading="lazy">';
+        $html = '<img src="' . \htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="QR Code" width="' . $size . '" height="' . $size . '" loading="lazy" decoding="async">';
 
         if (!empty($params['assign'])) {
             $template->assign($params['assign'], $html);
