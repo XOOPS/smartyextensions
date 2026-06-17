@@ -63,6 +63,23 @@ final class FormatExtensionTest extends TestCase
     }
 
     #[Test]
+    public function formatDatePassesThroughPreformattedString(): void
+    {
+        // Already-formatted display strings (e.g. XOOPS formatTimestamp output, which
+        // is non-ISO) are returned unchanged rather than re-parsed and reformatted.
+        $this->assertSame('2026/03/20 14:30', $this->ext->formatDate('2026/03/20 14:30', 'Y-m-d'));
+        $this->assertSame('March 20, 2026', $this->ext->formatDate('March 20, 2026'));
+        // An ISO-looking prefix with trailing text is NOT a clean timestamp — pass through.
+        $this->assertSame('2026-03-20 14:30 EST', $this->ext->formatDate('2026-03-20 14:30 EST', 'Y-m-d'));
+    }
+
+    #[Test]
+    public function relativeTimePassesThroughPreformattedString(): void
+    {
+        $this->assertSame('20 mars 2026', $this->ext->relativeTime('20 mars 2026'));
+    }
+
+    #[Test]
     public function bytesFormatConvertsOneMegabyte(): void
     {
         $this->assertSame('1 MB', $this->ext->bytesFormat(1048576));

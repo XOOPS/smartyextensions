@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`render_breadcrumbs`** (S2) — also accepts the XOOPS-native list of records
+  `[ ['link' => url, 'title' => label], … ]` (as produced by `$xoBreadCrumb`; `url`/`label`
+  keys are accepted as aliases), in addition to the original `url => label` map. The last crumb,
+  and any crumb with an empty link, renders as the non-linked active page.
+- **`translate`** (S4) — optional default argument: `<{"_MI_X"|translate:'Latest news'}>` returns
+  the default when the constant is undefined, letting it replace the `<{$smarty.const.X|default:'…'}>`
+  idiom (which otherwise leaks the literal constant name).
+
+### Changed
+
+- **`format_date` / `relative_time`** (S3) — only numeric Unix timestamps and ISO-8601-style strings
+  (`YYYY-MM-DD[ T]HH:MM[:SS]`) are parsed and reformatted; any other string is treated as an
+  already-formatted display value (e.g. XOOPS `formatTimestamp` output) and returned **unchanged**
+  rather than re-parsed and corrupted.
+
 ## [1.3.0 Beta1] — 2026-06-16
 
 ### Added

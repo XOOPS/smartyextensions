@@ -218,6 +218,55 @@ final class NavigationExtensionTest extends TestCase
         $this->assertSame('', $this->ext->renderBreadcrumbs(['items' => []], $tpl));
     }
 
+    #[Test]
+    public function renderBreadcrumbsAcceptsXoopsListShape(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $result = $this->ext->renderBreadcrumbs(
+            ['items' => [
+                ['link' => '/home', 'title' => 'Home'],
+                ['link' => '/news', 'title' => 'News'],
+                ['link' => '', 'title' => 'Article'],
+            ]],
+            $tpl,
+        );
+
+        $this->assertStringContainsString('<a href="/home">Home</a>', $result);
+        $this->assertStringContainsString('<a href="/news">News</a>', $result);
+        // Last crumb (empty link) is the non-linked active page.
+        $this->assertStringContainsString('aria-current="page">Article</li>', $result);
+        $this->assertStringNotContainsString('href="">Article', $result);
+    }
+
+    #[Test]
+    public function renderBreadcrumbsAcceptsUrlLabelAliasKeys(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $result = $this->ext->renderBreadcrumbs(
+            ['items' => [
+                ['url' => '/home', 'label' => 'Home'],
+                ['url' => '/here', 'label' => 'Here'],
+            ]],
+            $tpl,
+        );
+
+        $this->assertStringContainsString('<a href="/home">Home</a>', $result);
+        $this->assertStringContainsString('aria-current="page">Here</li>', $result);
+    }
+
+    #[Test]
+    public function renderBreadcrumbsHandlesMixedListWithoutWarning(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        // A null/scalar first element must not derail detection or cast an array to string.
+        $result = $this->ext->renderBreadcrumbs(
+            ['items' => [null, ['link' => '/x', 'title' => 'X']]],
+            $tpl,
+        );
+
+        $this->assertStringContainsString('aria-current="page">X</li>', $result);
+    }
+
     // ── Function: renderPagination ──────────────────────────
 
     #[Test]

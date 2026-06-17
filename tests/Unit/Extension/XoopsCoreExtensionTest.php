@@ -288,6 +288,21 @@ final class XoopsCoreExtensionTest extends TestCase
         $this->assertSame('Translated Value', $this->ext->translate('_MI_TEST_XOOPS_CORE_EXT'));
     }
 
+    #[Test]
+    public function translateReturnsDefaultWhenUndefinedAndDefaultGiven(): void
+    {
+        $this->assertSame('Latest news', $this->ext->translate('_MI_UNDEFINED_NEWS_TITLE', 'Latest news'));
+    }
+
+    #[Test]
+    public function translatePrefersConstantOverDefault(): void
+    {
+        if (!\defined('_MI_TEST_XOOPS_CORE_EXT2')) {
+            \define('_MI_TEST_XOOPS_CORE_EXT2', 'Defined Value');
+        }
+        $this->assertSame('Defined Value', $this->ext->translate('_MI_TEST_XOOPS_CORE_EXT2', 'Fallback'));
+    }
+
     // ──────────────────────────────────────────────
     // xo_get_module_info
     // ──────────────────────────────────────────────

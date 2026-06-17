@@ -190,27 +190,35 @@ final class NavigationExtension extends AbstractExtension
     /**
      * Render Bootstrap 5 breadcrumb navigation.
      *
+     * Accepts either input shape (S2):
+     *  - a `url => label` map (the original form), or
+     *  - the XOOPS-native list of records `[ ['link'=>url, 'title'=>label], … ]`
+     *    (also accepts `url`/`label` keys), as produced by `$xoBreadCrumb`.
+     * The last crumb — and any crumb with an empty link — is rendered as the
+     * non-linked active page.
+     *
      * @param array  $params   ['items' => array, 'assign' => string]
      * @param object $template Smarty_Internal_Template|Smarty\Template
      */
     public function renderBreadcrumbs(array $params, object $template): string
     {
-        $items = $params['items'] ?? [];
+        $rawItems = $params['items'] ?? [];
+        $crumbs = self::normalizeBreadcrumbs(\is_array($rawItems) ? $rawItems : []);
 
-        if (empty($items)) {
+        if ($crumbs === []) {
             return '';
         }
 
         $html = '<nav aria-label="breadcrumb"><ol class="breadcrumb">';
-        $keys = \array_keys($items);
-        $lastKey = \end($keys);
+        $lastIndex = \count($crumbs) - 1;
 
-        foreach ($items as $url => $label) {
-            $safeLabel = \htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8');
-            if ($url === $lastKey) {
+        foreach ($crumbs as $i => $crumb) {
+            $safeLabel = \htmlspecialchars($crumb['label'], ENT_QUOTES, 'UTF-8');
+
+            if ($i === $lastIndex || $crumb['url'] === '') {
                 $html .= '<li class="breadcrumb-item active" aria-current="page">' . $safeLabel . '</li>';
             } else {
-                $safeUrl = \htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8');
+                $safeUrl = \htmlspecialchars($crumb['url'], ENT_QUOTES, 'UTF-8');
                 $html .= '<li class="breadcrumb-item"><a href="' . $safeUrl . '">' . $safeLabel . '</a></li>';
             }
         }
@@ -223,6 +231,47 @@ final class NavigationExtension extends AbstractExtension
         }
 
         return $html;
+    }
+
+    /**
+     * Normalize either breadcrumb input shape to a list of ['label'=>, 'url'=>] (S2).
+     *
+     * @param array<mixed> $items
+     * @return list<array{label: string, url: string}>
+     */
+    private static function normalizeBreadcrumbs(array $items): array
+    {
+        if ($items === []) {
+            return [];
+        }
+
+        // A list (sequential integer keys) is the XOOPS-native record shape; a
+        // url => label map is associative. Non-array records are skipped.
+        if (\array_is_list($items)) {
+            $out = [];
+            foreach ($items as $item) {
+                if (!\is_array($item)) {
+                    continue;
+                }
+                $out[] = [
+                    'label' => (string) ($item['title'] ?? $item['label'] ?? ''),
+                    'url'   => (string) ($item['link'] ?? $item['url'] ?? ''),
+                ];
+            }
+
+            return $out;
+        }
+
+        // Original shape: url => label map (defensively skip any array values).
+        $out = [];
+        foreach ($items as $url => $label) {
+            if (\is_array($label)) {
+                continue;
+            }
+            $out[] = ['label' => (string) $label, 'url' => (string) $url];
+        }
+
+        return $out;
     }
 
     /**
