@@ -8,3 +8,24 @@ parameters:
     scanDirectories:
         - tests/stubs
     treatPhpDocTypesAsCertain: false
+    # The CI matrix runs prefer-lowest and prefer-stable, which install different
+    # Smarty majors; the resulting type-resolution differences mean some baselined
+    # entries are reported on one set but not the other. Tolerate unmatched baseline
+    # entries so a single committed baseline works across the whole matrix.
+    reportUnmatchedIgnoredErrors: false
+    # Smarty5Adapter is Smarty-5-only shim code: it extends \Smarty\Extension\Base
+    # and implements the \Smarty\FunctionHandler\… / \Smarty\BlockHandler\… interfaces,
+    # which do not exist when the CI matrix's prefer-lowest leg installs Smarty 4.x.
+    # The file is only instantiated at runtime under Smarty 5 (ExtensionRegistry
+    # version-detects), so static-analysing it across both Smarty majors is not
+    # meaningful — exclude it rather than carry version-fragile baseline entries.
+    excludePaths:
+        analyse:
+            - src/Adapter/Smarty5Adapter.php
+    ignoreErrors:
+        # \Smarty itself (used by AbstractExtension/ExtensionRegistry) is the global
+        # class on 4.x and an alias of \Smarty\Smarty registered at runtime on 5.x,
+        # which static analysis cannot follow; "unknown class Smarty…" only refers to
+        # the real library (our own Xoops\SmartyExtensions\… classes are always defined).
+        - '#unknown class Smarty#'
+        - '#invalid type Smarty#'
