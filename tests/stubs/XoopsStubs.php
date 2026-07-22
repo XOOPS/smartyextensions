@@ -22,6 +22,14 @@ if (!class_exists('XoopsSecurity', false)) {
         {
             return true;
         }
+
+        // Untyped, matching real \XoopsSecurity::createToken()'s loose signature
+        // (htdocs/class/xoopssecurity.php) — see project convention on core-method
+        // override compatibility (widen/untype, never narrow).
+        public function createToken($timeout = 0, $name = 'XOOPS_TOKEN')
+        {
+            return 'test-token';
+        }
     }
 }
 
