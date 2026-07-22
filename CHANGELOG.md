@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-07-22
+
+First stable release of the 1.3 line. Existing plugin behaviour is unchanged since
+1.3.0 Beta2; the Beta2 contract carries forward as-is.
+
+### Added
+
+- **`TokenExtension`** — new extension providing the `xoToken` function, which renders
+  `<meta name="xoops-token" content="…">` for the theme `<head>`. It lets fragment/AJAX
+  handlers read the XOOPS request token and attach it as the `X-XOOPS-TOKEN` header on
+  mutating requests. Emits an empty string when no `XoopsSecurity` instance is supplied,
+  so a theme rendering outside a XOOPS request degrades quietly. Retry forms continue to
+  use `form_open`'s injected hidden input — `xoToken` covers the AJAX header path only.
+
 ## [1.3.0 Beta2] — 2026-06-16
 
 ### Added
