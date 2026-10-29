@@ -123,9 +123,13 @@ Most functions support an `assign` parameter that stores the result in a templat
 <{is_user_logged_in}>
 
 <{* Right — assign and use as a condition *}>
+<{nocache}>
 <{is_user_logged_in assign="loggedIn"}>
 <{if $loggedIn}>Welcome back!<{/if}>
+<{/nocache}>
 ```
+
+With output caching on, wrap a user-dependent `assign` and every tag that reads the variable in `<{nocache}>`. The function itself runs on every request, but a later `<{if $loggedIn}>` is compiled as cacheable: its branch is decided once, when the cache is written, from a variable that may still be unset at that point, and that branch is then served to every visitor.
 
 ---
 
@@ -170,7 +174,7 @@ Output: `<p>First paragraph.</p><p>Second paragraph.<br>With a line break.</p>`
 
 ### Highlighting search terms
 
-> **HTML output warning**: `highlight_text` wraps matches in `<span>` tags and returns raw HTML. Ensure the source text is already escaped or trusted. Do not apply `|escape` after this modifier.
+> **HTML output warning**: `highlight_text` wraps matches in `<span>` tags and returns raw HTML. Ensure the source text is already escaped or trusted. Do not apply `|escape` after this modifier. A custom class may contain only letters, digits, `_`, `-` and spaces (up to 64 characters); anything else falls back to `highlight`.
 
 ```smarty
 <{* Wrap matches in <span class="highlight"> *}>
@@ -288,7 +292,7 @@ Output: `1.45 MB`
 <{$user.phone|format_phone_number}>
 ```
 
-Input `"5551234567"` becomes `(555) 123-4567`. Input `"15551234567"` becomes `+1 (555) 123-4567`.
+Input `"5551234567"` becomes `(555) 123-4567`. Input `"15551234567"` becomes `+1 (555) 123-4567`. Any other input is returned HTML-escaped, so do not add `|escape`.
 
 ### Gravatar URLs
 
@@ -362,7 +366,7 @@ Works with `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed/`, and `youtu
 
 ### Making URLs clickable
 
-> **HTML output warning**: `linkify` returns raw HTML with `<a>` tags. The surrounding text is not escaped. Pass only trusted or pre-sanitized content to avoid XSS. Do not apply `|escape` after this modifier.
+> **Plain text in, HTML out**: `linkify` HTML-escapes its input (already-escaped text such as `&amp;` is left as-is, not double-escaped) and then turns `http(s)://` URLs into `<a>` tags. Any markup in the input is displayed as text, so do not pass HTML. Do not apply `|escape` after this modifier.
 
 ```smarty
 <{$comment.body|linkify}>
@@ -431,7 +435,7 @@ Renders Bootstrap 5 pagination controls:
 <{render_pagination totalPages=$totalPages currentPage=$currentPage urlPattern="/news/?page={page}"}>
 ```
 
-The `{page}` placeholder in `urlPattern` is replaced with each page number.
+The `{page}` placeholder in `urlPattern` is replaced with each page number. Up to 100 pages are listed in full; beyond that the list switches to first/last plus two pages either side of the current one, and a `window` you pass is capped at 20.
 
 ### QR codes
 
@@ -481,7 +485,7 @@ DataExtension provides data manipulation, file utilities, and CSV/XML generation
 <pre><{$config|pretty_print_json}></pre>
 ```
 
-Also works with JSON strings (decodes, then re-encodes with formatting).
+Also works with JSON strings (decodes, then re-encodes with formatting). The result is HTML-escaped for display (`<`, `>` and `&` are encoded; quotes are left readable), so use it as element text, not inside an attribute, and do not add `|escape`.
 
 ### File information
 
@@ -590,7 +594,9 @@ FormExtension provides form rendering with automatic CSRF token injection.
 <{form_close}>
 ```
 
-The `form_open` function automatically injects a hidden CSRF token field for POST forms when `XoopsSecurity` is available.
+The `form_open` function automatically injects a hidden CSRF token field for POST forms when `XoopsSecurity` is available. The token is only added when the form submits back to this site: a relative `action`, or an absolute one with the same scheme, host and port as `XOOPS_URL`. Forms posting anywhere else never receive it.
+
+`form_input` passes extra parameters through as attributes, but drops names that are not plain attribute names, any `on*` event handler, and a `formaction` pointing off-site.
 
 ### File upload form
 
@@ -785,11 +791,14 @@ Use the `xo_permission` block to conditionally show content:
 ### Permission check functions
 
 ```smarty
+<{* nocache: the results depend on the current user (see "Important" above) *}>
+<{nocache}>
 <{is_user_logged_in assign="loggedIn"}>
 
 <{has_user_permission permission="module_admin" module_id=1 item_id=0 assign="isAdmin"}>
 
 <{user_has_role role="1" assign="isInGroup"}>
+<{/nocache}>
 ```
 
 ### String sanitization
@@ -808,7 +817,9 @@ Use the `xo_permission` block to conditionally show content:
 <{$value|sanitize_string_for_xml}>
 ```
 
-`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string.
+`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string. The accepted URL is returned HTML-escaped (`&` becomes `&amp;`, quotes become `&quot;`), ready to drop into an attribute — do not add `|escape` after it.
+
+`form_open`, `form_input` (`src`, `formaction`), `embed_pdf`, `render_breadcrumbs` and `render_pagination` apply the same scheme check: an unsafe `action` renders as `action=""`, an unsafe PDF URL renders nothing, an unsafe breadcrumb becomes plain text, and an unsafe pagination pattern links to `#`.
 
 ### Email privacy
 
@@ -853,6 +864,7 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 ### Current user
 
 ```smarty
+<{nocache}>
 <{xo_get_current_user assign="user"}>
 <{if $user}>
   <p>Hello, <{$user.uname}>!</p>
@@ -862,6 +874,7 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 <{else}>
   <a href="user.php">Login</a>
 <{/if}>
+<{/nocache}>
 ```
 
 The returned array contains: `uid`, `uname`, `name`, `email`, `groups`, `is_admin`.

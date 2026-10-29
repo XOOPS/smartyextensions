@@ -144,4 +144,26 @@ final class TextExtensionTest extends TestCase
     {
         $this->assertSame([], $this->ext->extractHashtags('No tags here'));
     }
+
+    #[Test]
+    public function highlightTextKeepsBackreferencesInClassLiteral(): void
+    {
+        // Pre-fix, "$1" expanded to the quoted match and opened an onmouseover attribute
+        $result = $this->ext->highlightText('say " onmouseover=alert(1) x', '" onmouseover=alert(1) x', '$1');
+        $this->assertStringNotContainsString('class="" onmouseover', $result);
+        $this->assertStringStartsWith('say <span class="highlight">', $result);
+    }
+
+    #[Test]
+    public function highlightTextKeepsValidCustomClass(): void
+    {
+        $this->assertSame('a <span class="search-match">b</span>', $this->ext->highlightText('a b', 'b', 'search-match'));
+    }
+
+    #[Test]
+    public function highlightTextFallsBackForOverlongClass(): void
+    {
+        $result = $this->ext->highlightText('aaa', 'a', str_repeat('x', 65));
+        $this->assertSame(3, substr_count($result, 'class="highlight"'));
+    }
 }

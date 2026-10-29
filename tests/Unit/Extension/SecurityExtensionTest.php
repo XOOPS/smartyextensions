@@ -128,6 +128,37 @@ final class SecurityExtensionTest extends TestCase
         $this->assertSame('', $this->ext->sanitizeUrl('javascript&#x3a;alert(1)'));
     }
 
+    #[Test]
+    public function sanitizeUrlBlocksNestedEntityColon(): void
+    {
+        // Decodes once to "javascript&#58;..." (no colon), then re-escapes: the browser's
+        // single attribute decode yields the inert relative URL "javascript&#58;alert(1)"
+        $this->assertSame('javascript&amp;#58;alert(1)', $this->ext->sanitizeUrl('javascript&#38;#58;alert(1)'));
+        $this->assertSame('javascript&amp;colon;alert(1)', $this->ext->sanitizeUrl('javascript&amp;colon;alert(1)'));
+    }
+
+    #[Test]
+    public function sanitizeUrlEncodesQuotesForAttributeUse(): void
+    {
+        $this->assertSame('/x&quot;onmouseover=&quot;alert(1)', $this->ext->sanitizeUrl('/x"onmouseover="alert(1)'));
+        $this->assertStringNotContainsString('"', $this->ext->sanitizeUrl('https://example.com/?q=&quot;onclick=&quot;alert(1)'));
+    }
+
+    #[Test]
+    public function sanitizeUrlEncodesAmpersandInQueryString(): void
+    {
+        $this->assertSame('/a?x=1&amp;y=2', $this->ext->sanitizeUrl('/a?x=1&y=2'));
+        $this->assertSame('/a?x=1&amp;y=2', $this->ext->sanitizeUrl('/a?x=1&amp;y=2'));
+    }
+
+    #[Test]
+    public function sanitizeUrlBlocksDataAndPaddedSchemes(): void
+    {
+        $this->assertSame('', $this->ext->sanitizeUrl('data:text/html,<script>alert(1)</script>'));
+        $this->assertSame('', $this->ext->sanitizeUrl(" \tjava\nscript:alert(1)"));
+        $this->assertSame('mailto:a@example.com', $this->ext->sanitizeUrl('mailto:a@example.com'));
+    }
+
     // ──────────────────────────────────────────────
     // Modifier: sanitize_filename
     // ──────────────────────────────────────────────

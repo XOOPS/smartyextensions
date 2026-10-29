@@ -7,6 +7,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **Smarty 4 output caching** — functions and block handlers are now registered
+  non-cacheable, matching `Smarty5Adapter`. A cached page no longer replays
+  `xo_permission` content or a `form_open` CSRF token to the next visitor.
+  Clear compiled templates and the output cache after upgrading. A tag that reads a
+  user-dependent `assign` result (`<{if $loggedIn}>`) is still cached; wrap the
+  function and its consumers in `<{nocache}>`.
+- **URL scheme checks** — `embed_pdf`, `form_open` (`action`), `form_input` (`src`,
+  `formaction`), `render_breadcrumbs` and `render_pagination` now reject
+  `javascript:`, `data:` and other executable schemes, sharing one check with
+  `sanitize_url` and the asset queue.
+- **`sanitize_url`** now returns its result HTML-escaped, so quotes and nested
+  entities (`javascript&amp;#58;`) can no longer break out of or re-enable the `href`.
+  **Breaking:** remove any `|escape` after `|sanitize_url`, or `&` in query strings
+  is double-encoded.
+- **`form_open`** only injects the CSRF token when the action is relative or matches
+  the `XOOPS_URL` origin (scheme, host and port).
+- **`form_input`** drops attribute names that are not plain names and `on*` handlers,
+  and drops a `formaction` that leaves the site (it would redirect a token-carrying form).
+- **`linkify`** now takes plain text, as the README describes: it HTML-escapes the input
+  (without double-escaping existing entities) and then links `http(s)://` URLs.
+  **Breaking:** HTML passed in is now displayed as text instead of being rendered.
+  Previously URLs inside existing attributes were rewritten, which could turn sanitized
+  HTML into executable markup; doing that safely needs a full HTML5 parser.
+- **`highlight_text`** keeps the custom class literal (no `$1` expansion) and limits it
+  to `[A-Za-z0-9_ -]{1,64}`, falling back to `highlight`.
+- **`format_phone_number`** (unrecognised input) and **`pretty_print_json`** now return
+  HTML-escaped text. **Breaking:** remove any `|escape` after them, or the output is
+  double-encoded; `pretty_print_json` output is for element text, not attributes.
+- **`base64_encode_file`, `get_file_size`, `get_mime_type`** reject stream wrappers,
+  UNC and `//host` paths before touching the filesystem.
+
+### Changed
+
+- `render_pagination` lists every page only up to 100 pages, then switches to a window
+  of 2; a caller `window` is capped at 20.
+- `number_format` clamps `decimals` to 0–20.
+
 ## [1.3.0] — 2026-07-22
 
 First stable release of the 1.3 line. Existing plugin behaviour is unchanged since
