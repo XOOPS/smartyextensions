@@ -396,4 +396,113 @@ final class FormExtensionTest extends TestCase
         $result = $ext->displayError(['message' => 'Oops', 'assign' => 'err'], $tpl);
         $this->assertSame('', $result);
     }
+
+    // ──────────────────────────────────────────────
+    // Hardening regressions
+    // ──────────────────────────────────────────────
+
+    #[Test]
+    public function formOpenDropsExecutableAction(): void
+    {
+        $ext = new FormExtension(new \XoopsSecurity());
+        $result = $ext->formOpen(['action' => 'javascript:alert(1)', 'method' => 'post'], $this->tpl());
+        $this->assertStringContainsString('action=""', $result);
+        $this->assertStringNotContainsString('javascript', $result);
+    }
+
+    #[Test]
+    public function formOpenOmitsTokenForExternalActions(): void
+    {
+        $ext = new FormExtension(new \XoopsSecurity());
+        foreach (['https://evil.example/steal', '//evil.example/a', '/\\evil.example/a', ' //evil.example/a', "/\t/evil.example/a"] as $action) {
+            $result = $ext->formOpen(['action' => $action, 'method' => 'post'], $this->tpl());
+            $this->assertStringNotContainsString('test-token', $result, $action);
+        }
+    }
+
+    #[Test]
+    public function formOpenKeepsTokenForRelativeActions(): void
+    {
+        $ext = new FormExtension(new \XoopsSecurity());
+        foreach (['', 'save.php', '/modules/x/save.php', '?op=save'] as $action) {
+            $result = $ext->formOpen(['action' => $action, 'method' => 'post'], $this->tpl());
+            $this->assertStringContainsString('test-token', $result, $action);
+        }
+    }
+
+    #[Test]
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    public function formOpenKeepsTokenOnlyForSiteHostWhenAbsolute(): void
+    {
+        \define('XOOPS_URL', 'https://example.com');
+        $ext = new FormExtension(new \XoopsSecurity());
+
+        $own = $ext->formOpen(['action' => 'https://EXAMPLE.com/save.php', 'method' => 'post'], $this->tpl());
+        $this->assertStringContainsString('test-token', $own);
+
+        $this->assertStringContainsString('test-token', $ext->formOpen(['action' => '//example.com/a', 'method' => 'post'], $this->tpl()));
+        $this->assertStringContainsString('test-token', $ext->formOpen(['action' => 'https://example.com:443/a', 'method' => 'post'], $this->tpl()));
+
+        $external = [
+            'https://example.com.evil.net/a',
+            'https://evil.net/example.com',
+            '//evil.net/a',
+            'http://example.com/steal',      // scheme differs
+            'https://example.com:8080/steal', // port differs
+        ];
+        foreach ($external as $action) {
+            $result = $ext->formOpen(['action' => $action, 'method' => 'post'], $this->tpl());
+            $this->assertStringNotContainsString('test-token', $result, $action);
+        }
+    }
+
+    #[Test]
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    public function formOpenTreatsEquivalentIpv6HostsAsSameOrigin(): void
+    {
+        \define('XOOPS_URL', 'https://[::1]');
+        $ext = new FormExtension(new \XoopsSecurity());
+        $result = $ext->formOpen(['action' => 'https://[0:0:0:0:0:0:0:1]/save', 'method' => 'post'], $this->tpl());
+        $this->assertStringContainsString('test-token', $result);
+
+        // Malformed literals and zone ids are never same-origin
+        foreach (['https://[[::1]]/save', 'https://[::1%25eth0]/save', 'https://[::1%eth0]/save'] as $action) {
+            $this->assertStringNotContainsString('test-token', $ext->formOpen(['action' => $action, 'method' => 'post'], $this->tpl()), $action);
+        }
+    }
+
+    #[Test]
+    public function formInputDropsExternalFormaction(): void
+    {
+        // formaction overrides a token-carrying form's action, so it must stay on-site
+        $ext = new FormExtension();
+        $external = $ext->formInput(['type' => 'submit', 'name' => 'go', 'formaction' => 'https://evil.example/steal'], $this->tpl());
+        $this->assertStringNotContainsString('formaction', $external);
+
+        $local = $ext->formInput(['type' => 'submit', 'name' => 'go', 'formaction' => '/modules/x/save.php'], $this->tpl());
+        $this->assertStringContainsString('formaction="/modules/x/save.php"', $local);
+    }
+
+    #[Test]
+    public function formInputDropsUnsafeAttributeNames(): void
+    {
+        $ext = new FormExtension();
+        $result = $ext->formInput([
+            'name'             => 'q',
+            'onfocus'          => 'alert(1)',
+            'autofocus onfocus' => 'alert(1)',
+            "x\n"              => 'y',
+            'formaction'       => 'javascript:alert(1)',
+            'data-id'          => '7',
+            'aria-label'       => 'Search',
+            'placeholder'      => 'Find',
+        ], $this->tpl());
+
+        $this->assertStringNotContainsString('onfocus', $result);
+        $this->assertStringNotContainsString('javascript', $result);
+        $this->assertStringNotContainsString("x\n", $result);
+        $this->assertStringContainsString('data-id="7"', $result);
+        $this->assertStringContainsString('aria-label="Search"', $result);
+        $this->assertStringContainsString('placeholder="Find"', $result);
+    }
 }

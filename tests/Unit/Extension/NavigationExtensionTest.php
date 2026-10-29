@@ -355,4 +355,154 @@ final class NavigationExtensionTest extends TestCase
         $result = $this->ext->generateCanonicalUrl(['path' => 'news/'], $tpl);
         $this->assertSame('', $result);
     }
+
+    // ── Hardening regressions ───────────────────────
+
+    #[Test]
+    public function breadcrumbsRenderUnsafeUrlAsPlainText(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $result = $this->ext->renderBreadcrumbs(['items' => ['javascript:alert(1)' => 'Evil', '/' => 'Home', '/here' => 'Here']], $tpl);
+        $this->assertStringNotContainsString('javascript', $result);
+        $this->assertStringContainsString('<a href="/">Home</a>', $result);
+    }
+
+    #[Test]
+    public function paginationNeutralisesUnsafeUrlPattern(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        foreach (['javascript:alert({page})', 'data:text/html,{page}'] as $pattern) {
+            $result = $this->ext->renderPagination(['totalPages' => 3, 'currentPage' => 2, 'urlPattern' => $pattern], $tpl);
+            $this->assertStringNotContainsString('javascript', $result);
+            $this->assertStringNotContainsString('data:', $result);
+            $this->assertStringContainsString('href="#"', $result);
+        }
+    }
+
+    #[Test]
+    public function paginationBoundsLinkCount(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $big = $this->ext->renderPagination(['totalPages' => 1000000, 'currentPage' => 500], $tpl);
+        $this->assertLessThan(20, substr_count($big, 'class="page-link"'));
+        $this->assertStringContainsString('?page=1000000', $big);
+
+        $wide = $this->ext->renderPagination(['totalPages' => 1000000, 'currentPage' => 500, 'window' => 999999], $tpl);
+        $this->assertLessThan(50, substr_count($wide, 'class="page-link"'));
+
+        $small = $this->ext->renderPagination(['totalPages' => 100, 'currentPage' => 1], $tpl);
+        $this->assertStringNotContainsString('&hellip;', $small);
+    }
+
+    #[Test]
+    public function linkifyEscapesMarkupInInput(): void
+    {
+        $this->assertSame(
+            '&lt;b title=&quot;x&quot;&gt;hi&lt;/b&gt; <a href="https://x.test" target="_blank" rel="noopener noreferrer nofollow">https://x.test</a>',
+            $this->ext->linkify('<b title="x">hi</b> https://x.test')
+        );
+    }
+
+    #[Test]
+    public function linkifyDoesNotDoubleEscapeEscapedText(): void
+    {
+        $result = $this->ext->linkify('a &amp; b https://x.test/?a=1&amp;b=2');
+        $this->assertStringStartsWith('a &amp; b <a href="https://x.test/?a=1&amp;b=2"', $result);
+    }
+
+    #[Test]
+    public function linkifyDropsNulSoHrefMatchesVisibleText(): void
+    {
+        $this->assertStringContainsString('<a href="https://x.test/ab"', $this->ext->linkify("https://x.test/a\0b"));
+    }
+
+    #[Test]
+    public function linkifyStopsUrlBeforeEscapedQuote(): void
+    {
+        $this->assertSame(
+            '&quot;<a href="https://x.test" target="_blank" rel="noopener noreferrer nofollow">https://x.test</a>&quot;',
+            $this->ext->linkify('"https://x.test"')
+        );
+    }
+
+    #[Test]
+    public function linkifyOutputHasOnlyGeneratedAnchorsUnderHtml5Parsing(): void
+    {
+        if (!\class_exists(\Dom\HTMLDocument::class)) {
+            $this->markTestSkipped('Needs the PHP 8.4 HTML5 parser');
+        }
+
+        $parse = static fn (string $html): \Dom\HTMLDocument
+            => \Dom\HTMLDocument::createFromString('<!doctype html><body>' . $html . '</body>', LIBXML_NOERROR);
+
+        $payload = 'https://x/onerror=alert(1)//';
+        $corpus = [
+            // Codex round 4: quote-free markup let this become a real <script>
+            '<svg><![CDATA[ > <x y="]]></svg><p title="x>" data-url=https://x/ data-note="<script>alert(1)</script>">',
+            '<textarea>https://x/</textarea>',
+            '<p a=b=" c="x>' . $payload . '">',
+            '<p ="x y=" z>' . $payload . '">',
+            '<svg><![CDATA[ > <x y="]]><img src=x title=">' . $payload . '"></svg>',
+            '<a href="/"><img src="x" title="</a> ' . $payload . '"></a>',
+            '<img src="x" title="<b>' . $payload,
+            '<img src="x" title=">' . $payload . '">',
+            '<textarea><b title="</textarea>' . $payload . '"></textarea>',
+            '<!--> ' . $payload . ' -->',
+            '<p a=' . $payload . ' b>',
+            '<p ' . $payload . '>',
+        ];
+
+        // Deterministic fuzz over tag/quote/equals soup around the payload
+        \mt_srand(20261028);
+        $alphabet = ['<', '>', '"', "'", '=', ' ', '/', '!', '-', '?', 'a', 'p', 'img', 'x', "\t", '</a>', '<a>', $payload];
+        for ($n = 0; $n < 3000; $n++) {
+            $s = '';
+            for ($k = \mt_rand(3, 18); $k > 0; $k--) {
+                $s .= $alphabet[\mt_rand(0, \count($alphabet) - 1)];
+            }
+            $corpus[] = $s;
+        }
+
+        foreach ($corpus as $input) {
+            $label = \json_encode($input);
+            $out = $parse($this->ext->linkify($input));
+
+            // Every element in the output is a generated anchor: no input markup survives
+            foreach ($out->body->getElementsByTagName('*') as $el) {
+                $this->assertSame('a', $el->localName, $label);
+                $this->assertSame('http://www.w3.org/1999/xhtml', $el->namespaceURI, $label);
+                $names = \array_map(static fn ($a) => $a->name, \iterator_to_array($el->attributes, false));
+                $this->assertSame(['href', 'target', 'rel'], $names, $label);
+                $this->assertMatchesRegularExpression('~^https?://~i', $el->getAttribute('href'), $label);
+            }
+
+            // Linking changes no visible text
+            $plain = $parse(\htmlspecialchars($input, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false));
+            $this->assertSame($plain->body->textContent, $out->body->textContent, $label);
+        }
+    }
+
+    #[Test]
+    public function linkifyIsLinearOnManyOpenAnchors(): void
+    {
+        $start = hrtime(true);
+        $this->ext->linkify(str_repeat('<a>', 100000) . 'https://x.test');
+        $this->assertLessThan(2000, (hrtime(true) - $start) / 1e6, 'linkify must stay roughly linear');
+    }
+
+    #[Test]
+    public function linkifyKeepsTextWhenReplacementFails(): void
+    {
+        $limit = ini_get('pcre.backtrack_limit');
+        $jit = ini_get('pcre.jit');
+        ini_set('pcre.jit', '0');
+        ini_set('pcre.backtrack_limit', '1');
+        try {
+            $this->assertSame('see https://x.test', $this->ext->linkify('see https://x.test'));
+        } finally {
+            ini_set('pcre.backtrack_limit', (string) $limit);
+            ini_set('pcre.jit', (string) $jit);
+        }
+    }
+
 }

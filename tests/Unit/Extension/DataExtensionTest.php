@@ -349,4 +349,42 @@ final class DataExtensionTest extends TestCase
         $this->assertSame('', $result);
         unset($_SERVER['HTTP_REFERER']);
     }
+
+    // ── Hardening regressions ───────────────────────
+
+    #[Test]
+    public function embedPdfRejectsExecutableSchemes(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        foreach (['javascript:alert(1)', 'JaVaScRiPt:alert(1)', ' javascript:alert(1)', 'data:text/html,x'] as $url) {
+            $this->assertSame('', $this->ext->embedPdf(['url' => $url], $tpl), $url);
+        }
+        $this->assertStringContainsString('src="/docs/a.pdf"', $this->ext->embedPdf(['url' => '/docs/a.pdf'], $tpl));
+    }
+
+    #[Test]
+    public function prettyPrintJsonEncodesMarkup(): void
+    {
+        $result = $this->ext->prettyPrintJson(['a' => '</pre><script>alert(1)</script>']);
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    #[Test]
+    public function fileHelpersRejectNetworkPathsBeforeProbing(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        foreach (['ftp://127.0.0.1/x', 'phar://x.phar/a', 'php://filter/resource=x', '\\\\host\\share\\x', '//host/x', "a\0b"] as $path) {
+            $this->assertSame('', $this->ext->base64EncodeFile(['path' => $path], $tpl), $path);
+            $this->assertSame('', $this->ext->getFileSize($path), $path);
+            $this->assertSame('', $this->ext->getMimeType($path), $path);
+        }
+    }
+
+    #[Test]
+    public function fileHelpersStillReadLocalFiles(): void
+    {
+        $this->assertNotSame('', $this->ext->getFileSize(__FILE__));
+        $this->assertNotSame('', $this->ext->getMimeType(__FILE__));
+    }
 }

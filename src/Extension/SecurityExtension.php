@@ -184,27 +184,18 @@ final class SecurityExtension extends AbstractExtension
     /**
      * Sanitize a URL, removing illegal characters and blocking unsafe schemes.
      *
-     * Decodes HTML entities before checking the scheme so that entity-encoded
-     * bypass attempts like "javascript&#58;alert(1)" are correctly blocked.
+     * Decodes HTML entities once before checking the scheme so that entity-encoded
+     * bypass attempts like "javascript&#58;alert(1)" are correctly blocked, then
+     * HTML-escapes the result for direct use in an attribute: href="<{$url|sanitize_url}>".
+     * The browser decodes the attribute exactly once, back to the validated value,
+     * so leftover entities (javascript&amp;#58;) and quotes cannot change it.
      */
     public function sanitizeUrl(string $url): string
     {
         $sanitized = \filter_var($url, FILTER_SANITIZE_URL);
-
-        // Decode HTML entities so encoded colons/schemes cannot bypass checks
         $decoded = \html_entity_decode($sanitized, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Only allow safe schemes (mailto: uses : not ://)
-        if (\preg_match('#^(https?|ftp)://#i', $decoded) || \preg_match('#^mailto:#i', $decoded) || \str_starts_with($decoded, '/') || \str_starts_with($decoded, '#')) {
-            return $decoded;
-        }
-
-        // Relative URLs without scheme are OK
-        if (!\str_contains($decoded, ':')) {
-            return $decoded;
-        }
-
-        return '';
+        return self::isSafeUrl($decoded) ? \htmlspecialchars($decoded, ENT_QUOTES, 'UTF-8') : '';
     }
 
     /**

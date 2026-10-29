@@ -30,7 +30,7 @@ class Template {}
 
 class Smarty
 {
-    public function registerPlugin(string $type, string $name, callable $callback): void {}
+    public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void {}
 
     public function addExtension(object $extension): void {}
 

@@ -255,4 +255,17 @@ final class FormatExtensionTest extends TestCase
         $this->assertNotEmpty($result);
         $this->assertStringContainsString('1,234', $result);
     }
+
+    #[Test]
+    public function formatPhoneNumberEncodesUnrecognisedInput(): void
+    {
+        $this->assertSame('&lt;script&gt;alert(1)&lt;/script&gt;', $this->ext->formatPhoneNumber('<script>alert(1)</script>'));
+    }
+
+    #[Test]
+    public function numberFormatClampsDecimals(): void
+    {
+        $this->assertSame('1.00000000000000000000', $this->ext->numberFormat(1, 100000));
+        $this->assertSame('1', $this->ext->numberFormat(1, -5));
+    }
 }

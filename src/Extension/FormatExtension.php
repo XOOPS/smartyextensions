@@ -203,7 +203,8 @@ final class FormatExtension extends AbstractExtension
         string $decPoint = '.',
         string $thousandsSep = ',',
     ): string {
-        return \number_format((float) $number, $decimals, $decPoint, $thousandsSep);
+        // Clamp: number_format() allocates one byte per requested decimal
+        return \number_format((float) $number, \max(0, \min(20, $decimals)), $decPoint, $thousandsSep);
     }
 
     /**
@@ -249,7 +250,8 @@ final class FormatExtension extends AbstractExtension
             return '+1 (' . \substr($digits, 1, 3) . ') ' . \substr($digits, 4, 3) . '-' . \substr($digits, 7);
         }
 
-        return $phoneNumber;
+        // Unrecognised input is shown as-is, so encode it like any display text
+        return \htmlspecialchars($phoneNumber, ENT_QUOTES, 'UTF-8');
     }
 
     /**

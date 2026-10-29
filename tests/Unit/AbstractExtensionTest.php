@@ -41,20 +41,21 @@ final class AbstractExtensionTest extends TestCase
         };
 
         $smarty = new class {
-            /** @var list<array{string, string}> */
+            /** @var list<array{string, string, bool}> */
             public array $calls = [];
-            public function registerPlugin(string $type, string $name, callable $callback): void
+            public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void
             {
-                $this->calls[] = [$type, $name];
+                $this->calls[] = [$type, $name, $cacheable];
             }
         };
 
         $ext->register($smarty);
 
+        // Functions and blocks are non-cacheable, matching Smarty5Adapter
         $this->assertSame([
-            ['modifier', 'my_mod'],
-            ['function', 'my_func'],
-            ['block', 'my_block'],
+            ['modifier', 'my_mod', true],
+            ['function', 'my_func', false],
+            ['block', 'my_block', false],
         ], $smarty->calls);
     }
 }

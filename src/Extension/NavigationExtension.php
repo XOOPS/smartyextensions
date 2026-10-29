@@ -215,7 +215,7 @@ final class NavigationExtension extends AbstractExtension
         foreach ($crumbs as $i => $crumb) {
             $safeLabel = \htmlspecialchars($crumb['label'], ENT_QUOTES, 'UTF-8');
 
-            if ($i === $lastIndex || $crumb['url'] === '') {
+            if ($i === $lastIndex || $crumb['url'] === '' || !self::isSafeUrl($crumb['url'])) {
                 $html .= '<li class="breadcrumb-item active" aria-current="page">' . $safeLabel . '</li>';
             } else {
                 $safeUrl = \htmlspecialchars($crumb['url'], ENT_QUOTES, 'UTF-8');
@@ -306,8 +306,13 @@ final class NavigationExtension extends AbstractExtension
         }
 
         $urlPattern = (string) ($params['urlPattern'] ?? '?page={page}');
-        $window = \max(0, (int) ($params['window'] ?? 0));
         $totalPages = \max(1, $totalPages);
+        // Bound the rendered links: past 100 pages the default full list becomes
+        // a window of 2, and a caller window is capped at 20.
+        $window = \min(20, \max(0, (int) ($params['window'] ?? 0)));
+        if ($window === 0 && $totalPages > 100) {
+            $window = 2;
+        }
         $currentPage = \max(1, \min($currentPage, $totalPages));
 
         if ($totalPages <= 1) {
@@ -328,7 +333,7 @@ final class NavigationExtension extends AbstractExtension
                 $urlPattern,
             );
 
-            return \htmlspecialchars($replaced, ENT_QUOTES, 'UTF-8');
+            return self::isSafeUrl($replaced) ? \htmlspecialchars($replaced, ENT_QUOTES, 'UTF-8') : '#';
         };
 
         $html = '<nav aria-label="Page navigation"><ul class="pagination">';
@@ -594,13 +599,23 @@ final class NavigationExtension extends AbstractExtension
 
     /**
      * Convert URLs in text to clickable links.
+     *
+     * Input is plain text: it is HTML-escaped first (existing entities are kept, so
+     * already-escaped text is not double-escaped), then URLs become anchors. The
+     * result is escaped text plus generated <a> elements only; any markup in the
+     * input is shown as text. Rewriting URLs inside arbitrary HTML safely needs a
+     * full HTML5 parser, which this library does not ship.
      */
     public function linkify(string $text): string
     {
+        // NUL is dropped from text by browsers but becomes U+FFFD in an href; remove it first
+        $escaped = \htmlspecialchars(\str_replace("\0", '', $text), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+
+        // Stop the URL before an escaped quote or angle bracket that followed it in the input
         return \preg_replace(
-            '~(https?://[^\s<>"\']+)~i',
-            '<a href="$1" target="_blank" rel="noopener noreferrer nofollow">$1</a>',
-            $text
-        );
+            '~https?://(?:(?!&(?:quot|#0*39|apos|lt|gt);)[^\s<>"\'])+~i',
+            '<a href="$0" target="_blank" rel="noopener noreferrer nofollow">$0</a>',
+            $escaped
+        ) ?? $escaped;
     }
 }

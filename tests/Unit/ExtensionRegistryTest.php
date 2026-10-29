@@ -55,7 +55,7 @@ final class ExtensionRegistryTest extends TestCase
         $smarty = new class {
             /** @var list<array{string, string}> */
             public array $calls = [];
-            public function registerPlugin(string $type, string $name, callable $callback): void
+            public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void
             {
                 $this->calls[] = [$type, $name];
             }
@@ -80,7 +80,7 @@ final class ExtensionRegistryTest extends TestCase
         $smarty = new class {
             /** @var list<array{string, string}> */
             public array $calls = [];
-            public function registerPlugin(string $type, string $name, callable $callback): void
+            public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void
             {
                 $this->calls[] = [$type, $name];
             }
@@ -117,5 +117,48 @@ final class ExtensionRegistryTest extends TestCase
         $smarty->assign('count', 2);
         $result2 = $smarty->fetch('string:<{$count|pluralize:"item"}>');
         $this->assertSame('items', $result2);
+    }
+
+    #[Test]
+    public function permissionBlockIsReEvaluatedOnSharedOutputCache(): void
+    {
+        if (!class_exists(\Smarty\Smarty::class) && !class_exists(\Smarty::class)) {
+            $this->markTestSkipped('No Smarty runtime available');
+        }
+
+        $dir = sys_get_temp_dir() . '/smartyext-cache-' . bin2hex(random_bytes(4));
+        $render = static function () use ($dir): string {
+            $smarty = class_exists(\Smarty\Smarty::class) ? new \Smarty\Smarty() : new \Smarty();
+            $smarty->setLeftDelimiter('<{');
+            $smarty->setRightDelimiter('}>');
+            $smarty->setCompileDir($dir . '/c');
+            $smarty->setCacheDir($dir . '/k');
+            $smarty->setCaching(1);
+            $smarty->setCacheLifetime(300);
+            (new \Xoops\SmartyExtensions\Extension\SecurityExtension())->register($smarty);
+
+            return $smarty->fetch('string:<{xo_permission logged_in=1}>PRIVATE<{/xo_permission}>');
+        };
+
+        $saved = $GLOBALS['xoopsUser'] ?? null;
+        try {
+            $GLOBALS['xoopsUser'] = new \XoopsUser();
+            $this->assertSame('PRIVATE', $render());
+
+            $GLOBALS['xoopsUser'] = null; // anonymous reader, same cache entry
+            $this->assertSame('', $render());
+        } finally {
+            $GLOBALS['xoopsUser'] = $saved;
+            if (is_dir($dir)) {
+                $it = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::CHILD_FIRST,
+                );
+                foreach ($it as $f) {
+                    $f->isDir() ? rmdir($f->getPathname()) : unlink($f->getPathname());
+                }
+                rmdir($dir);
+            }
+        }
     }
 }
