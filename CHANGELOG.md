@@ -27,6 +27,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the `XOOPS_URL` origin (scheme, host and port).
 - **`form_input`** drops attribute names that are not plain names and `on*` handlers,
   and drops a `formaction` that leaves the site (it would redirect a token-carrying form).
+  Relative actions stay as written; the tutorial documents the injected `<base href>`
+  risk and the page-level `Content-Security-Policy: base-uri 'self'` mitigation.
 - **`linkify`** now takes plain text, as the README describes: it HTML-escapes the input
   (without double-escaping existing entities) and then links `http(s)://` URLs.
   **Breaking:** HTML passed in is now displayed as text instead of being rendered.

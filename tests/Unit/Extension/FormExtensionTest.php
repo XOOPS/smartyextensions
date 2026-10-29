@@ -424,9 +424,11 @@ final class FormExtensionTest extends TestCase
     public function formOpenKeepsTokenForRelativeActions(): void
     {
         $ext = new FormExtension(new \XoopsSecurity());
-        foreach (['', 'save.php', '/modules/x/save.php', '?op=save'] as $action) {
+        // Module-relative actions stay relative (not rewritten against XOOPS_URL) and keep the token
+        foreach (['', 'save.php', 'index.php', 'index.php?op=save&id=3', '../news/save.php', '/modules/x/save.php', '?op=save'] as $action) {
             $result = $ext->formOpen(['action' => $action, 'method' => 'post'], $this->tpl());
             $this->assertStringContainsString('test-token', $result, $action);
+            $this->assertStringContainsString('action="' . \htmlspecialchars($action, ENT_QUOTES, 'UTF-8') . '"', $result, $action);
         }
     }
 
@@ -481,6 +483,10 @@ final class FormExtensionTest extends TestCase
 
         $local = $ext->formInput(['type' => 'submit', 'name' => 'go', 'formaction' => '/modules/x/save.php'], $this->tpl());
         $this->assertStringContainsString('formaction="/modules/x/save.php"', $local);
+
+        // Module-relative overrides are kept as written
+        $relative = $ext->formInput(['type' => 'submit', 'name' => 'del', 'formaction' => 'index.php?op=delete'], $this->tpl());
+        $this->assertStringContainsString('formaction="index.php?op=delete"', $relative);
     }
 
     #[Test]
