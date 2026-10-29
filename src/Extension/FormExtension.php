@@ -109,14 +109,15 @@ final class FormExtension extends AbstractExtension
                 continue;
             }
             $lower = \strtolower($attr);
-            if ($lower === 'src' || $lower === 'formaction') {
-                if (
+            if (
+                ($lower === 'src' || $lower === 'formaction')
+                && (
                     !\is_string($attrValue)
                     || !self::isSafeUrl($attrValue)
                     || ($lower === 'formaction' && !self::isSameOrigin($attrValue))
-                ) {
-                    continue;
-                }
+                )
+            ) {
+                continue;
             }
             $html .= ' ' . $attr . '="' . \htmlspecialchars((string) $attrValue, ENT_QUOTES, 'UTF-8') . '"';
         }
@@ -342,21 +343,33 @@ final class FormExtension extends AbstractExtension
         }
 
         $scheme = \strtolower($parts['scheme']);
-        $port = $parts['port'] ?? ($scheme === 'https' ? 443 : ($scheme === 'http' ? 80 : 0));
+        $port = $parts['port'] ?? match ($scheme) {
+            'https' => 443,
+            'http' => 80,
+            default => 0,
+        };
 
-        // IPv6 literal: exactly one bracket pair around a valid address (no zone id),
-        // canonicalised so [::1] and [0:0:0:0:0:0:0:1] compare equal
         $host = \strtolower($parts['host']);
         if (\str_contains($host, '[') || \str_contains($host, ']')) {
-            $ip = \preg_match('/^\[([0-9a-f:.]+)\]\z/', $host, $m) === 1 ? $m[1] : '';
-            $packed = \filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? \inet_pton($ip) : false;
-            $canonical = $packed !== false ? \inet_ntop($packed) : false;
-            if ($canonical === false) {
+            $host = self::canonicalIpv6Host($host);
+            if ($host === null) {
                 return null;
             }
-            $host = '[' . $canonical . ']';
         }
 
         return [$scheme, $host, $port];
+    }
+
+    /**
+     * Bracketed IPv6 literal in canonical form, so [::1] and [0:0:0:0:0:0:0:1] compare
+     * equal; null unless it is exactly one bracket pair around a valid address (no zone id).
+     */
+    private static function canonicalIpv6Host(string $host): ?string
+    {
+        $ip = \preg_match('/^\[([0-9a-f:.]+)\]\z/', $host, $m) === 1 ? $m[1] : '';
+        $packed = \filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? \inet_pton($ip) : false;
+        $canonical = $packed !== false ? \inet_ntop($packed) : false;
+
+        return $canonical === false ? null : '[' . $canonical . ']';
     }
 }
