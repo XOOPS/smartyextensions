@@ -452,13 +452,14 @@ final class NavigationExtensionTest extends TestCase
             '<p ' . $payload . '>',
         ];
 
-        // Deterministic fuzz over tag/quote/equals soup around the payload
-        \mt_srand(20261028);
+        // Deterministic fuzz over tag/quote/equals soup around the payload. A seeded,
+        // local engine keeps every run identical; nothing here needs unpredictability.
+        $rng = new \Random\Randomizer(new \Random\Engine\Mt19937(20261028));
         $alphabet = ['<', '>', '"', "'", '=', ' ', '/', '!', '-', '?', 'a', 'p', 'img', 'x', "\t", '</a>', '<a>', $payload];
         for ($n = 0; $n < 3000; $n++) {
             $s = '';
-            for ($k = \mt_rand(3, 18); $k > 0; $k--) {
-                $s .= $alphabet[\mt_rand(0, \count($alphabet) - 1)];
+            for ($k = $rng->getInt(3, 18); $k > 0; $k--) {
+                $s .= $alphabet[$rng->getInt(0, \count($alphabet) - 1)];
             }
             $corpus[] = $s;
         }
