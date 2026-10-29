@@ -53,17 +53,17 @@ final class ExtensionRegistryTest extends TestCase
         $ext = $this->createTestExtension();
 
         $smarty = new class {
-            /** @var list<array{string, string}> */
+            /** @var list<array{string, string, bool}> */
             public array $calls = [];
             public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void
             {
-                $this->calls[] = [$type, $name];
+                $this->calls[] = [$type, $name, $cacheable];
             }
         };
 
         $ext->register($smarty);
 
-        $this->assertSame([['modifier', 'test_mod']], $smarty->calls);
+        $this->assertSame([['modifier', 'test_mod', true]], $smarty->calls);
     }
 
     #[Test]
@@ -78,11 +78,11 @@ final class ExtensionRegistryTest extends TestCase
         };
 
         $smarty = new class {
-            /** @var list<array{string, string}> */
+            /** @var list<array{string, string, bool}> */
             public array $calls = [];
             public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void
             {
-                $this->calls[] = [$type, $name];
+                $this->calls[] = [$type, $name, $cacheable];
             }
         };
 
@@ -90,9 +90,10 @@ final class ExtensionRegistryTest extends TestCase
             $ext->register($smarty);
         }
 
+        // Functions must be non-cacheable so a cached page re-runs them per visitor.
         $this->assertSame([
-            ['modifier', 'test_mod'],
-            ['function', 'test_func'],
+            ['modifier', 'test_mod', true],
+            ['function', 'test_func', false],
         ], $smarty->calls);
     }
 

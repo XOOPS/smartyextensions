@@ -123,9 +123,13 @@ Most functions support an `assign` parameter that stores the result in a templat
 <{is_user_logged_in}>
 
 <{* Right — assign and use as a condition *}>
+<{nocache}>
 <{is_user_logged_in assign="loggedIn"}>
 <{if $loggedIn}>Welcome back!<{/if}>
+<{/nocache}>
 ```
+
+With output caching on, wrap a user-dependent `assign` and every tag that reads the variable in `<{nocache}>`. The function itself runs on every request, but a later `<{if $loggedIn}>` is compiled as cacheable: its branch is decided once, when the cache is written, from a variable that may still be unset at that point, and that branch is then served to every visitor.
 
 ---
 
@@ -787,11 +791,14 @@ Use the `xo_permission` block to conditionally show content:
 ### Permission check functions
 
 ```smarty
+<{* nocache: the results depend on the current user (see "Important" above) *}>
+<{nocache}>
 <{is_user_logged_in assign="loggedIn"}>
 
 <{has_user_permission permission="module_admin" module_id=1 item_id=0 assign="isAdmin"}>
 
 <{user_has_role role="1" assign="isInGroup"}>
+<{/nocache}>
 ```
 
 ### String sanitization
@@ -857,6 +864,7 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 ### Current user
 
 ```smarty
+<{nocache}>
 <{xo_get_current_user assign="user"}>
 <{if $user}>
   <p>Hello, <{$user.uname}>!</p>
@@ -866,6 +874,7 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 <{else}>
   <a href="user.php">Login</a>
 <{/if}>
+<{/nocache}>
 ```
 
 The returned array contains: `uid`, `uname`, `name`, `email`, `groups`, `is_admin`.

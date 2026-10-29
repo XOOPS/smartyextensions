@@ -16,7 +16,7 @@ class Smarty
      * @param callable $callback  Plugin callback
      * @param bool     $cacheable false re-runs the plugin on every request of a cached page
      */
-    public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void {}
+    public function registerPlugin(string $type, string $name, callable $callback, bool $cacheable = true): void {} // NOSONAR php:S1172 signature mirrors Smarty
 
     /**
      * @param \Smarty\Extension\Base $extension

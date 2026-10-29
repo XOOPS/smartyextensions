@@ -12,7 +12,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Smarty 4 output caching** — functions and block handlers are now registered
   non-cacheable, matching `Smarty5Adapter`. A cached page no longer replays
   `xo_permission` content or a `form_open` CSRF token to the next visitor.
-  Clear compiled templates and the output cache after upgrading.
+  Clear compiled templates and the output cache after upgrading. A tag that reads a
+  user-dependent `assign` result (`<{if $loggedIn}>`) is still cached; wrap the
+  function and its consumers in `<{nocache}>`.
 - **URL scheme checks** — `embed_pdf`, `form_open` (`action`), `form_input` (`src`,
   `formaction`), `render_breadcrumbs` and `render_pagination` now reject
   `javascript:`, `data:` and other executable schemes, sharing one check with
