@@ -317,6 +317,8 @@ This prevents double-escaping while maintaining XSS safety at every output point
 
 HTML escaping protects element text and **quoted** attributes only. Always quote attributes (`title="<{$n|number_format}>"`); a space in an unquoted value starts a new attribute. JavaScript, CSS and URL contexts need their own encoding.
 
+Several modifiers also return HTML-escaped text: `format_date`, `relative_time`, `format_currency`, `number_format`, `format_phone_number`, `mask_email`, `sanitize_url` and `pretty_print_json`. The same applies to `datetime_diff` when it prints directly. If Smarty's `$escape_html` is on, print them with `nofilter` (`<{$price|number_format:2:'.':"'" nofilter}>`), or the escaping is applied twice. Don't pipe them into `|escape:'url'` or `|escape:'javascript'`. In those contexts, format the value in PHP or with Smarty's built-in `date_format`.
+
 ---
 
 ## Running Tests

@@ -276,6 +276,8 @@ final class FormatExtensionTest extends TestCase
         $this->assertSame('&lt;b&gt;x&lt;/b&gt;', $this->ext->relativeTime('<b>x</b>'));
         $this->assertSame('1&lt;i&gt;234.50', $this->ext->numberFormat(1234.5, 2, '.', '<i>'));
         $this->assertSame('&lt;b&gt;2026', $this->ext->formatDate('2026-03-20', '<\b>Y'));
+        // Invalid UTF-8 becomes U+FFFD instead of erasing the whole value
+        $this->assertSame("Caf\u{FFFD}", $this->ext->formatDate("Caf\xe9"));
     }
 
     #[Test]

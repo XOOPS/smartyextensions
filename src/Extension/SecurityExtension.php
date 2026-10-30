@@ -232,7 +232,7 @@ final class SecurityExtension extends AbstractExtension
     {
         $parts = \explode('@', $email, 2);
         if (\count($parts) !== 2) {
-            return \htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+            return \htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         $local = $parts[0];
@@ -243,7 +243,7 @@ final class SecurityExtension extends AbstractExtension
         $visibleChars = \max(1, (int) \ceil($length / 3));
         $masked = \mb_substr($local, 0, $visibleChars, 'UTF-8') . \str_repeat('*', \max(3, $length - $visibleChars));
 
-        return \htmlspecialchars($masked . '@' . $domain, ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($masked . '@' . $domain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**

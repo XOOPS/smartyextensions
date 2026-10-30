@@ -68,7 +68,7 @@ final class FormatExtension extends AbstractExtension
         }
 
         // DateInterval::format() keeps literal format text, so encode direct output
-        return \htmlspecialchars($result, ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($result, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
@@ -102,10 +102,10 @@ final class FormatExtension extends AbstractExtension
         // Already-formatted display strings (e.g. XOOPS formatTimestamp output) are
         // returned unchanged rather than re-parsed and reformatted (S3).
         if ($dateObj === null) {
-            return \htmlspecialchars((string) $date, ENT_QUOTES, 'UTF-8');
+            return \htmlspecialchars((string) $date, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
-        return \htmlspecialchars($dateObj->format($format), ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($dateObj->format($format), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
@@ -119,7 +119,7 @@ final class FormatExtension extends AbstractExtension
 
         // A pre-formatted display string cannot be made relative — pass it through (S3).
         if ($date === null) {
-            return \htmlspecialchars((string) $timestamp, ENT_QUOTES, 'UTF-8');
+            return \htmlspecialchars((string) $timestamp, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         $now = new \DateTimeImmutable();
@@ -190,7 +190,7 @@ final class FormatExtension extends AbstractExtension
         }
 
         // ICU echoes an unknown currency code, and the symbol is free text
-        return \htmlspecialchars($result, ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($result, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
@@ -211,7 +211,7 @@ final class FormatExtension extends AbstractExtension
         $result = \number_format((float) $number, \max(0, \min(20, $decimals)), $decPoint, $thousandsSep);
 
         // Separators are free text
-        return \htmlspecialchars($result, ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($result, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
@@ -258,7 +258,7 @@ final class FormatExtension extends AbstractExtension
         }
 
         // Unrecognised input is shown as-is, so encode it like any display text
-        return \htmlspecialchars($phoneNumber, ENT_QUOTES, 'UTF-8');
+        return \htmlspecialchars($phoneNumber, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**
