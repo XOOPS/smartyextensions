@@ -315,6 +315,8 @@ All extensions follow a consistent **assign contract**:
 
 This prevents double-escaping while maintaining XSS safety at every output point.
 
+HTML escaping protects element text and **quoted** attributes only. Always quote attributes (`title="<{$n|number_format}>"`); a space in an unquoted value starts a new attribute. JavaScript, CSS and URL contexts need their own encoding.
+
 ---
 
 ## Running Tests

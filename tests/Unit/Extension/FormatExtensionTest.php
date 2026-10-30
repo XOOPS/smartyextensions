@@ -268,4 +268,32 @@ final class FormatExtensionTest extends TestCase
         $this->assertSame('1.00000000000000000000', $this->ext->numberFormat(1, 100000));
         $this->assertSame('1', $this->ext->numberFormat(1, -5));
     }
+
+    #[Test]
+    public function displayModifiersEncodeHtml(): void
+    {
+        $this->assertSame('&lt;b&gt;x&lt;/b&gt;', $this->ext->formatDate('<b>x</b>'));
+        $this->assertSame('&lt;b&gt;x&lt;/b&gt;', $this->ext->relativeTime('<b>x</b>'));
+        $this->assertSame('1&lt;i&gt;234.50', $this->ext->numberFormat(1234.5, 2, '.', '<i>'));
+        $this->assertSame('&lt;b&gt;2026', $this->ext->formatDate('2026-03-20', '<\b>Y'));
+    }
+
+    #[Test]
+    public function formatCurrencyEncodesHtml(): void
+    {
+        // ICU echoes an unknown ISO code (upper-cased); the fallback uses the symbol
+        $expected = \class_exists(\NumberFormatter::class) ? '&lt;B&gt;1.00' : '&lt;b&gt;1.00';
+        $this->assertSame($expected, $this->ext->formatCurrency(1, '<b>', 'en_US', '<b>'));
+    }
+
+    #[Test]
+    public function datetimeDiffEncodesDirectOutputOnly(): void
+    {
+        $params = ['start' => '2024-01-01', 'end' => '2024-01-02', 'format' => '<b>%d</b>'];
+        $this->assertSame('&lt;b&gt;1&lt;/b&gt;', $this->ext->datetimeDiff($params, $this->createMock(TemplateStub::class)));
+
+        $tpl = $this->createMock(TemplateStub::class);
+        $tpl->expects($this->once())->method('assign')->with('d', '<b>1</b>');
+        $this->ext->datetimeDiff($params + ['assign' => 'd'], $tpl);
+    }
 }

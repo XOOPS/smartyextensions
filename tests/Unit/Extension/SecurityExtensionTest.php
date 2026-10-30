@@ -230,6 +230,25 @@ final class SecurityExtensionTest extends TestCase
         $this->assertSame('not-an-email', $this->ext->maskEmail('not-an-email'));
     }
 
+    #[Test]
+    public function maskEmailEncodesMalformedInput(): void
+    {
+        $this->assertSame('&lt;b&gt;', $this->ext->maskEmail('<b>'));
+    }
+
+    #[Test]
+    public function maskEmailEncodesDomain(): void
+    {
+        $this->assertSame('a***@&lt;img src=x onerror=alert(1)&gt;', $this->ext->maskEmail('a@<img src=x onerror=alert(1)>'));
+    }
+
+    #[Test]
+    public function maskEmailKeepsMultibyteCharactersWhole(): void
+    {
+        $this->assertSame('é***@x', $this->ext->maskEmail('é@x'));
+        $this->assertSame('éé***@x', $this->ext->maskEmail('ééééé@x'));
+    }
+
     // ──────────────────────────────────────────────
     // Modifier: obfuscate_text
     // ──────────────────────────────────────────────
