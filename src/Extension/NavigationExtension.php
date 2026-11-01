@@ -52,6 +52,13 @@ final class NavigationExtension extends AbstractExtension
     /**
      * Generate a URL from a route and query parameters.
      *
+     * A route with an executable scheme (javascript:, data:, ...), also when
+     * entity-encoded (javascript&#58;), or an array/object route yields an empty
+     * string on both the direct-output and assign paths. A null route counts as
+     * an empty one. Because the assigned value may be printed unescaped, a route
+     * whose decoded form has a scheme (foo&#58;bar) is rejected too, although
+     * escaped output would render it inert.
+     *
      * @param array  $params   ['route' => string, 'params' => array, 'assign' => string]
      * @param object $template Smarty_Internal_Template|Smarty\Template
      */
@@ -60,9 +67,14 @@ final class NavigationExtension extends AbstractExtension
         $route = $params['route'] ?? '';
         $queryParams = $params['params'] ?? [];
 
-        $url = $route;
+        $url = \is_string($route) ? $route : '';
         if (!empty($queryParams) && \is_array($queryParams)) {
             $url .= '?' . \http_build_query($queryParams);
+        }
+        // Check the decoded form too: an assigned raw URL printed into href unescaped
+        // would let the browser turn javascript&#58; back into javascript:.
+        if (!\is_string($route) || !self::isSafeUrl($url) || !self::isSafeUrl(self::decodeAsAttribute($url))) {
+            $url = '';
         }
 
         if (!empty($params['assign'])) {
@@ -72,6 +84,34 @@ final class NavigationExtension extends AbstractExtension
         }
 
         return \htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Decode a value the way a browser decodes an attribute, then drop the tab,
+     * CR and LF that the URL parser strips.
+     *
+     * Unlike html_entity_decode(), numeric references decode with or without ';'
+     * and for every code point (&#13;); invalid ones become U+FFFD. Named
+     * references decode only with ';'. One pass, so &#38;colon; stays "&colon;".
+     */
+    private static function decodeAsAttribute(string $value): string
+    {
+        $decoded = \preg_replace_callback(
+            '/&(?:#x([0-9a-f]+);?|#([0-9]+);?|([a-z][a-z0-9]*;))/i',
+            static function (array $m): string {
+                if (($m[3] ?? '') !== '') {
+                    return \html_entity_decode('&' . $m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
+                $digits = $m[1] !== '' ? \ltrim($m[1], '0') : \ltrim($m[2], '0');
+                $codePoint = \strlen($digits) > 7 ? 0x110000 : (int) ($m[1] !== '' ? \hexdec($digits === '' ? '0' : $digits) : $digits);
+                $char = $codePoint > 0 && $codePoint <= 0x10FFFF ? \mb_chr($codePoint, 'UTF-8') : false;
+
+                return $char === false ? "\u{FFFD}" : $char;
+            },
+            $value,
+        );
+
+        return \str_replace(["\t", "\r", "\n"], '', $decoded ?? $value);
     }
 
     /**

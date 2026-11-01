@@ -19,6 +19,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `formaction`), `render_breadcrumbs` and `render_pagination` now reject
   `javascript:`, `data:` and other executable schemes, sharing one check with
   `sanitize_url` and the asset queue.
+- **`generate_url`** now applies the same check to its `route`: a `javascript:`,
+  `data:` or other executable route (also entity-encoded, `javascript&#58;`), or an
+  array route, yields an empty string on both direct output and `assign`. Since the
+  assigned URL may be printed unescaped, a route that only gains a scheme after entity
+  decoding (`foo&#58;bar`) is rejected as well.
 - **`sanitize_url`** now returns its result HTML-escaped, so quotes and nested
   entities (`javascript&amp;#58;`) can no longer break out of or re-enable the `href`.
   **Breaking:** remove any `|escape` after `|sanitize_url`, or `&` in query strings

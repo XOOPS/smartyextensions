@@ -113,7 +113,7 @@ Most functions support an `assign` parameter that stores the result in a templat
 
 ```smarty
 <{generate_url route="/search" params=$queryParams assign="searchUrl"}>
-<a href="<{$searchUrl}>">Search</a>
+<a href="<{$searchUrl|escape}>">Search</a>
 ```
 
 **Important**: Functions that return boolean or structured data (like `validate_form`, `is_user_logged_in`, `has_user_permission`, `xo_get_current_user`) should always be used with `assign`. Their direct output is either empty or a stringified `'1'`/`''`, which is rarely useful in templates.
@@ -325,8 +325,10 @@ NavigationExtension provides URL manipulation, breadcrumbs, pagination, and soci
 
 ```smarty
 <{generate_url route="/modules/news/article.php" params=$queryParams assign="articleUrl"}>
-<a href="<{$articleUrl}>">Read article</a>
+<a href="<{$articleUrl|escape}>">Read article</a>
 ```
+
+A route with an executable scheme such as `javascript:` or `data:` produces an empty string, so check the result when the route comes from user data.
 
 ### Canonical URLs
 
