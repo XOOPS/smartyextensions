@@ -55,7 +55,7 @@ The full contract is in the `AbstractExtension` class docblock.
 - Text functions escape direct output with `htmlspecialchars()` using `ENT_QUOTES` and `'UTF-8'`. Add `ENT_SUBSTITUTE` where the value may hold invalid UTF-8: without it the whole string comes back empty.
 - With an `assign` parameter, text functions store the raw value; only direct output is escaped.
 - HTML-generating functions (`createButton`, `renderFormErrors`, `displayError`) return or assign finished markup with its dynamic parts escaped. Their docblocks say "exception to the raw-in-assign contract"; templates print the assigned variable with `nofilter`.
-- Other formats (JSON, XML, URLs) use the escaping of that format, not HTML escaping.
+- Values in another format are built with that format's encoder (`http_build_query`/`urlencode`, `json_encode`, `fputcsv`), then HTML-escaped when printed into the page: `generate_url` and `array_to_csv` direct output use `ENT_QUOTES`, `pretty_print_json` uses `ENT_NOQUOTES` for `<pre>` text. `assign` still stores the raw value. Only a standalone document the function builds whole, such as the sitemap XML, uses its own escaping (`ENT_XML1`) instead.
 - Block handlers receive `$content` already rendered by Smarty. Don't re-escape it.
 - Validate externally supplied URLs for `href`, `src` or `action` with `AbstractExtension::isSafeUrl()` before escaping. URLs the library builds itself, such as the QR code `data:` URI, follow their own construction rules.
 - Use `mb_*` functions on user text before escaping; a byte-cut multibyte character becomes invalid UTF-8.
@@ -86,7 +86,7 @@ PHPStan runs at level `max` over `src/` with `phpstan-baseline.neon`. New code m
 
 - **GitHub Actions:** PHP 8.2 (plus lowest deps), 8.3, 8.4, 8.5. Each run: `composer validate`, lint (non-blocking), analyse, test.
 - **Coverage:** PHP 8.3 with Xdebug, uploaded to Codecov.
-- **Also:** SonarCloud, Qodana, Scrutinizer, CodeRabbit.
+- **Also:** SonarCloud (automatic analysis), Scrutinizer, CodeRabbit. The `sonarcloud.yml` and `qodana.yml` workflow jobs are guarded to `XOOPS/xmf` and skip here.
 
 ## Pull Request Checklist
 
