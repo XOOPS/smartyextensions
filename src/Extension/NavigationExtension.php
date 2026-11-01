@@ -73,7 +73,9 @@ final class NavigationExtension extends AbstractExtension
         }
         // Check the decoded form too: an assigned raw URL printed into href unescaped
         // would let the browser turn javascript&#58; back into javascript:.
-        if (!\is_string($route) || !self::isSafeUrl($url) || !self::isSafeUrl(self::decodeAsAttribute($url))) {
+        // A failed decode (null) rejects the URL rather than re-checking the raw form.
+        $decodedUrl = self::decodeAsAttribute($url);
+        if (!\is_string($route) || !self::isSafeUrl($url) || $decodedUrl === null || !self::isSafeUrl($decodedUrl)) {
             $url = '';
         }
 
@@ -93,25 +95,35 @@ final class NavigationExtension extends AbstractExtension
      * Unlike html_entity_decode(), numeric references decode with or without ';'
      * and for every code point (&#13;); invalid ones become U+FFFD. Named
      * references decode only with ';'. One pass, so &#38;colon; stays "&colon;".
+     * Returns null if the regex engine fails, so the caller can reject the value.
      */
-    private static function decodeAsAttribute(string $value): string
+    private static function decodeAsAttribute(string $value): ?string
     {
         $decoded = \preg_replace_callback(
             '/&(?:#x([0-9a-f]+);?|#([0-9]+);?|([a-z][a-z0-9]*;))/i',
-            static function (array $m): string {
-                if (($m[3] ?? '') !== '') {
-                    return \html_entity_decode('&' . $m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                }
-                $digits = $m[1] !== '' ? \ltrim($m[1], '0') : \ltrim($m[2], '0');
-                $codePoint = \strlen($digits) > 7 ? 0x110000 : (int) ($m[1] !== '' ? \hexdec($digits === '' ? '0' : $digits) : $digits);
-                $char = $codePoint > 0 && $codePoint <= 0x10FFFF ? \mb_chr($codePoint, 'UTF-8') : false;
-
-                return $char === false ? "\u{FFFD}" : $char;
-            },
+            static fn (array $m): string => ($m[3] ?? '') !== ''
+                ? \html_entity_decode('&' . $m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                : self::numericReferenceToChar($m[1], $m[2] ?? ''),
             $value,
         );
 
-        return \str_replace(["\t", "\r", "\n"], '', $decoded ?? $value);
+        return $decoded === null ? null : \str_replace(["\t", "\r", "\n"], '', $decoded);
+    }
+
+    /**
+     * Character for a numeric reference: hex digits or decimal digits (one is '').
+     * Zero, surrogates and code points above U+10FFFF become U+FFFD, as in browsers.
+     */
+    private static function numericReferenceToChar(string $hex, string $decimal): string
+    {
+        $digits = \ltrim($hex !== '' ? $hex : $decimal, '0');
+        if ($digits === '' || \strlen($digits) > 7) {
+            return "\u{FFFD}";
+        }
+        $codePoint = $hex !== '' ? (int) \hexdec($digits) : (int) $digits;
+        $char = $codePoint <= 0x10FFFF ? \mb_chr($codePoint, 'UTF-8') : false;
+
+        return $char === false ? "\u{FFFD}" : $char;
     }
 
     /**
