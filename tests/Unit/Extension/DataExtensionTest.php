@@ -390,6 +390,16 @@ final class DataExtensionTest extends TestCase
         unset($_SESSION['cart']);
     }
 
+    #[Test]
+    public function getSessionDataSubstitutesInvalidUtf8(): void
+    {
+        $_SESSION['pref'] = "a\xFF<b>";
+        $result = $this->ext->getSessionData(['key' => 'pref'], $this->createMock(TemplateStub::class));
+        unset($_SESSION['pref']);
+
+        $this->assertSame("a\u{FFFD}&lt;b&gt;", $result);
+    }
+
     // ── Hardening regressions ───────────────────────
 
     #[Test]

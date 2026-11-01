@@ -875,11 +875,14 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 
 ```smarty
 <{xo_get_config name="sitename" assign="siteName"}>
-<title><{$siteName}></title>
+<title><{$siteName|escape}></title>
 
 <{xo_get_config name="slogan" assign="slogan"}>
-<p><{$slogan}></p>
+<p><{$slogan|escape}></p>
 ```
+
+Direct output (`<{xo_get_config name="sitename"}>`) is already HTML-escaped; an
+`assign`ed value is raw, so escape it when you print it.
 
 ### Current user
 

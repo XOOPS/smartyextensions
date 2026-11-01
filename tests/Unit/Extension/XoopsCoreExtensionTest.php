@@ -131,6 +131,14 @@ final class XoopsCoreExtensionTest extends TestCase
         $this->assertSame('', $result);
     }
 
+    #[Test]
+    public function xoGetConfigSubstitutesInvalidUtf8(): void
+    {
+        $GLOBALS['xoopsConfig'] = ['sitename' => "a\xFF<b>"];
+        $result = $this->ext->xoGetConfig(['name' => 'sitename'], $this->tpl());
+        $this->assertSame("a\u{FFFD}&lt;b&gt;", $result);
+    }
+
     // ──────────────────────────────────────────────
     // xo_get_current_user
     // ──────────────────────────────────────────────

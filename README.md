@@ -259,7 +259,7 @@ Wrappers around XOOPS globals and handlers.
 
 ```smarty
 <{xo_get_config name="sitename" assign="siteName"}>
-<title><{$siteName}></title>
+<title><{$siteName|escape}></title>
 
 <{"_MI_NEWS_LATEST_TITLE"|translate}>
 ```
