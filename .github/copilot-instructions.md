@@ -50,7 +50,7 @@ On Windows, `.\scripts\ci.ps1` runs the same steps with lint as advisory; `-Skip
 
 ## Output and Escaping Contract
 
-The full contract is in the `AbstractExtension` class docblock.
+The `AbstractExtension` class docblock states the assign, HTML-generator and block-handler rules. The rules below add per-plugin escaping, `ENT_SUBSTITUTE`, format-specific encoding and URL validation.
 
 - Escaping is decided per plugin, not per plugin type. Plugins that produce a finished display value (formatted dates, masked or sanitised strings, functions that print a plain-text value) escape their direct output with `htmlspecialchars()` using `ENT_QUOTES` and `'UTF-8'`. Add `ENT_SUBSTITUTE` where the value may hold invalid UTF-8: without it the whole string comes back empty. With an `assign` parameter, functions store the raw value; only direct output is escaped.
 - The text-transform modifiers in `TextExtension` are not display values: `excerpt`, `truncate_words`, `reading_time` and `pluralize` return unescaped text that the template escapes, and `nl2p` and `highlight_text` return markup by design. Don't add escaping to them. `nl2p` and `highlight_text` keep any HTML in their input active, so their input must be trusted markup or already escaped (`|escape` before the modifier).
