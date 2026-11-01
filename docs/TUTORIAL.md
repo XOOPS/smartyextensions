@@ -265,7 +265,7 @@ Uses the ICU NumberFormatter when the `intl` extension is available:
 <{$product.price|format_currency:"GBP":"en_GB":"£"}>
 ```
 
-Date, number and currency modifiers return HTML-escaped text, so pass literal characters (`£`, a no-break space) rather than entities such as `&pound;` or `&nbsp;`, and do not apply `|escape` after them.
+Date, number and currency modifiers return HTML-escaped text, so pass literal characters (`£`, a no-break space) rather than entities such as `&pound;` or `&nbsp;`, and do not apply `|escape` after them. If Smarty's `$escape_html` is on, print them with `nofilter` (`<{$product.price|format_currency nofilter}>`), or the escaping is applied twice.
 
 ### Number formatting
 
