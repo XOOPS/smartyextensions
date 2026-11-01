@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Xoops\SmartyExtensions\Test\Unit\Extension;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Xoops\SmartyExtensions\Extension\NavigationExtension;
@@ -161,6 +162,66 @@ final class NavigationExtensionTest extends TestCase
             $tpl,
         );
         $this->assertSame('', $result);
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function unsafeRouteProvider(): array
+    {
+        return [
+            'javascript'        => ['javascript:alert(1)'],
+            'mixed case'        => ['JaVaScRiPt:alert(1)'],
+            'data'              => ['data:text/html,<script>alert(1)</script>'],
+            'leading space'     => [' javascript:alert(1)'],
+            'tab inside scheme' => ["java\tscript:alert(1)"],
+            'decimal entity'    => ['javascript&#58;alert(1)'],
+            'named entity'      => ['javascript&colon;alert(1)'],
+            'hex entity'        => ['&#x6A;avascript:alert(1)'],
+            'decimal no semi'   => ['javascript&#58alert(1)'],
+            'hex no semi'       => ['javascript&#x3A/alert(1)'],
+            'padded no semi'    => ['javascript&#0000058alert(1)'],
+            'encoded CR'        => ['java&#13;script&#58;alert(1)'],
+            'encoded LF no semi' => ['java&#10script&#58alert(1)'],
+            'encoded hex tab'   => ['java&#x09;script&#x3a;alert(1)'],
+            'decoded-form colon' => ['foo&#58;bar'],
+            'non-string'        => [['javascript:alert(1)']],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('unsafeRouteProvider')]
+    public function generateUrlRejectsUnsafeRouteOnDirectOutput(mixed $route): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $result = $this->ext->generateUrl(['route' => $route, 'params' => ['id' => '5']], $tpl);
+        $this->assertSame('', $result);
+    }
+
+    #[Test]
+    #[DataProvider('unsafeRouteProvider')]
+    public function generateUrlAssignsEmptyStringForUnsafeRoute(mixed $route): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $tpl->expects($this->once())->method('assign')->with('u', '');
+        $this->assertSame('', $this->ext->generateUrl(['route' => $route, 'assign' => 'u'], $tpl));
+    }
+
+    #[Test]
+    public function generateUrlKeepsSafeAbsoluteAndRelativeRoutes(): void
+    {
+        $tpl = $this->createMock(\Xoops\SmartyExtensions\Test\Stubs\TemplateStub::class);
+        $this->assertSame(
+            'https://example.com/a.php?x=1&amp;y=2',
+            $this->ext->generateUrl(['route' => 'https://example.com/a.php', 'params' => ['x' => 1, 'y' => 2]], $tpl),
+        );
+        $this->assertSame('/search?q=a%3Ab', $this->ext->generateUrl(['route' => '/search', 'params' => ['q' => 'a:b']], $tpl));
+        $this->assertSame('page.php?x=a:b', $this->ext->generateUrl(['route' => 'page.php?x=a:b'], $tpl));
+        $this->assertSame('?id=1', $this->ext->generateUrl(['route' => null, 'params' => ['id' => 1]], $tpl));
+        // One decode pass, like the browser: &#38;colon; becomes the text "&colon;", not ":"
+        $this->assertSame('a&amp;#38;colon;b', $this->ext->generateUrl(['route' => 'a&#38;colon;b'], $tpl));
+        // Invalid code points do not crash and do not form a scheme
+        $this->assertSame('x&amp;#99999999999;y', $this->ext->generateUrl(['route' => 'x&#99999999999;y'], $tpl));
     }
 
     // ── Function: renderAlert ───────────────────────────────
