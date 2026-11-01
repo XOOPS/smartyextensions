@@ -1,101 +1,98 @@
-# XMF — XOOPS Module Framework: Copilot Instructions
+# xoops/smartyextensions: Copilot Instructions
 
 <!-- Generic XOOPS conventions: see .github/xoops-copilot-template.md for reuse in other repos -->
 
 ## About This Repository
 
-XMF is a PHP utility library for the XOOPS CMS. It provides input filtering, database helpers, JWT tokens, meta tag generation, YAML handling, ULID/UUID generation, and module administration tools.
+`xoops/smartyextensions` is a PHP library of Smarty 4/5 template plugins for the XOOPS CMS: formatting, text, navigation, forms, security, assets, data, CSRF token and XOOPS core helpers. Plugins are grouped by domain into extension classes. Callers add the extensions they want to an `ExtensionRegistry` and register them on each Smarty instance.
 
 ## Project Layout
 
 ```
-src/                      # Library source (namespace: Xmf\)
-tests/unit/               # PHPUnit tests (namespace: Xmf\Test\)
-stubs/                    # PHPStan stub files for XOOPS core classes
-.github/workflows/ci.yml  # GitHub Actions: tests, PHPStan, PHPCS, coverage
+src/                          # Library source (namespace: Xoops\SmartyExtensions\)
+src/AbstractExtension.php     # Base class: getModifiers()/getFunctions()/getBlockHandlers() + Smarty 4 register()
+src/ExtensionRegistry.php     # Registers added extensions; wraps each in Smarty5Adapter on Smarty 5
+src/Adapter/Smarty5Adapter.php
+src/Extension/*Extension.php  # One final class per plugin domain
+tests/Unit/                   # PHPUnit 11 tests (namespace: Xoops\SmartyExtensions\Test\)
+tests/stubs/                  # Test bootstrap stubs, also scanned by PHPStan
+stubs/                        # Smarty 4/5, XOOPS, Ray and DebugBar stubs for IDEs and analysis
+.github/workflows/ci.yml      # GitHub Actions: lint, PHPStan, PHPUnit, coverage
 ```
 
 ## Build & Test
 
 ```bash
-composer install          # Install dependencies
-composer test             # Run PHPUnit tests
-composer analyse          # Run PHPStan (level max)
-composer lint             # Check code style (PSR-12)
-composer fix              # Auto-fix code style issues
-composer baseline         # Regenerate PHPStan baseline
-composer ci               # Run all checks (lint + analyse + test)
+composer install
+composer test       # PHPUnit
+composer analyse    # PHPStan (level max)
+composer lint       # PHPCS (PSR-12)
+composer fix        # PHPCBF
+make ci             # install -> lint -> analyse -> test; stops on a lint failure
 ```
 
-PHPUnit uses a single `phpunit.xml.dist` with `<source>` element (compatible with PHPUnit 9.3.4+ through 11.x).
+On Windows, `.\scripts\ci.ps1` runs the same steps with lint as advisory; `-SkipInstall` skips `composer install`.
 
-## PHP Compatibility
+## PHP and Smarty Compatibility
 
-Code must run on PHP 7.4 through 8.5. Do not use features exclusive to PHP 8.0+ (named arguments, match expressions, union type hints in signatures, enums, fibers, readonly properties, intersection types, `never` return type, first-class callable syntax). CI tests all versions in the matrix.
+- PHP 8.2+ (`composer.json`: `^8.2`). PHP 8.2 features are allowed: constructor promotion, readonly properties, `match`, union types, enums.
+- Smarty `^4.5 || ^5.0`. Code must work on both majors; CI's lowest-deps leg installs Smarty 4.
+- Smarty 5-only code belongs in `src/Adapter/Smarty5Adapter.php`, which PHPStan excludes. `\Smarty` is the global class on 4.x and a runtime alias on 5.x.
 
 ## Coding Conventions
 
-- Follow PSR-12. Line length limit is 200 characters (see `phpcs.xml`).
-- Every source file begins with the XOOPS copyright header block.
-- Class docblocks include `@category`, `@package`, `@author`, `@copyright`, `@license`, and `@link` tags.
-- Use `self::` for constants (e.g., `self::ENCODING`). PHPStan level max cannot resolve `static::` on constants and reports `mixed`.
-- Prefer `\Throwable` in catch blocks over `\Exception` to cover both exceptions and errors.
-- Use `trigger_error()` with `E_USER_WARNING` for non-fatal file operation failures. Use `basename()` in error messages to avoid exposing absolute paths.
-- Suppress PHP-native warnings with `@` when a subsequent `=== false` check and explicit `trigger_error()` provide a cleaner error path (e.g., `@file_get_contents()`, `@filesize()`).
+- Every PHP file in `src/` and `tests/` starts with `declare(strict_types=1);` and follows PSR-12 (`phpcs.xml`). The analysis stubs in `stubs/` mirror third-party signatures and are exempt; don't add strict types to them.
+- Class docblocks carry `@copyright` and `@license` tags.
+- Use `self::` for constants defined by the class.
+- Extension classes are `final`, extend `AbstractExtension`, and return `name => callable` maps from `getModifiers()`, `getFunctions()` and `getBlockHandlers()`.
+- Prefer `\Throwable` in catch blocks over `\Exception`.
+- Encoding is passed as the literal `'UTF-8'`. The repo has no `ENCODING` class constant; don't add one to a single class.
 
-## XOOPS Compatibility Layer
+## Output and Escaping Contract
 
-Classes check `class_exists('Xoops', false)` to detect XOOPS 2.6+ and fall back to XOOPS 2.5 globals (`$GLOBALS['xoopsModule']`, `xoops_getHandler()`). Never assume XOOPS is present at runtime. This pattern allows XMF to work with both XOOPS generations and in standalone testing.
+The `AbstractExtension` class docblock states the assign, HTML-generator and block-handler rules. The rules below add per-plugin escaping, `ENT_SUBSTITUTE`, format-specific encoding and URL validation.
 
-## XMF-Specific Architecture
+- Escaping is decided per plugin, not per plugin type. Plugins that produce a finished display value (formatted dates, masked or sanitised strings, functions that print a plain-text value) escape their direct output with `htmlspecialchars()` using `ENT_QUOTES` and `'UTF-8'`. Add `ENT_SUBSTITUTE` where the value may hold invalid UTF-8: without it the whole string comes back empty. With an `assign` parameter, functions store the raw value; only direct output is escaped.
+- The text-transform modifiers in `TextExtension` are not display values: `excerpt`, `truncate_words`, `reading_time` and `pluralize` return unescaped text that the template escapes, and `nl2p` and `highlight_text` return markup by design. Don't add escaping to them. `nl2p` and `highlight_text` keep any HTML in their input active, so their input must be trusted markup or already escaped (`|escape` before the modifier).
+- Known gaps on `master`, pending in PR #38: `format_date`, `relative_time`, `datetime_diff`, `format_currency` and `number_format` return caller text unescaped; `mask_email` cuts by bytes and returns the domain (and input without `@`) unescaped. Not yet addressed: `xo_get_config` and `get_session_data` print their value unescaped on direct output. Treat the rule above as binding for new and changed code, and don't flag these eight as regressions in unrelated PRs.
+- These functions return or assign the finished markup with its dynamic parts escaped, not a raw value: `createButton`, `renderFormErrors`, `displayError`, `embedPdf`, `generateMetaTags`, `renderBreadcrumbs`, `renderPagination`, `renderQrCode`, `renderAlert`, `xoAvatar`, `xoRenderMenu`, `generateCsrfToken`. Templates print the assigned variable with `nofilter`; don't escape it again. When you add such a function, add it to this list and mark its docblock "exception to the raw-in-assign contract".
+- Exceptions with mixed output: `flushCss` and `flushJs` print markup but assign the raw entry arrays; `socialShare` assigns the share URL for a single `platform` and markup for the full bar; `xoRenderBlock` passes through the content the block provides.
+- Values in another format are built with that format's encoder (`http_build_query`/`urlencode`, `json_encode`, `fputcsv`), then HTML-escaped when printed into the page: `generate_url` and `array_to_csv` direct output use `ENT_QUOTES`, `pretty_print_json` uses `ENT_NOQUOTES` for `<pre>` text. `assign` still stores the raw value. Only a standalone document the function builds whole, such as the sitemap XML, uses its own escaping (`ENT_XML1`) instead.
+- Block handlers receive `$content` already rendered by Smarty. Don't re-escape it.
+- Validate externally supplied URLs for `href`, `src` or `action` with `AbstractExtension::isSafeUrl()` before escaping. URLs the library builds itself, such as the QR code `data:` URI, follow their own construction rules. Known gap: `generate_url` does not yet validate its `route` parameter, so a `javascript:` route passes through; until it is fixed, templates must pass it only trusted routes.
+- Use `mb_*` functions on user text before escaping; a byte-cut multibyte character becomes invalid UTF-8.
 
-- **Static utility classes**: Most classes expose static methods (`Request::getInt()`, `Yaml::read()`, `Metagen::generateSeoTitle()`). This is intentional — do not refactor to instance methods.
-- **Singleton factories**: `FilterInput::getInstance()` caches instances keyed by configuration signature.
-- **PHP-wrapped YAML**: `Yaml::dumpWrapped()` / `readWrapped()` embed YAML inside `<?php /* --- ... */ ?>` to prevent direct serving of config files. The `---` and `...` markers delimit the YAML content.
-- **ENCODING constant**: `Metagen::ENCODING` and `Highlighter::ENCODING` are `'UTF-8'`. Always reference the class constant, never hardcode the string.
+## Smarty Caching
 
-## Security Considerations
+Functions and blocks are registered non-cacheable; modifiers are not. A non-cacheable function does not make the tags that read its `assign` variable non-cacheable: a later `<{if $var}>` is compiled into the cache and served to every visitor. When the value depends on the user, wrap the call and every reader in `<{nocache}>…<{/nocache}>`.
 
-- All user input must go through `Request::getVar()` or `FilterInput::clean()`.
-- `FilterInput` strips dangerous HTML tags and event handler attributes (`on*`). Blacklists include `<script>`, `<applet>`, `<iframe>`, and `javascript:` / `vbscript:` URIs.
-- `Key\FileStorage::save()` uses `var_export()` for PHP code generation — never string interpolation.
-- `Module\Helper\Session::get()` passes `['allowed_classes' => false]` to `unserialize()`.
-- `Language::loadFile()` validates paths with `realpath()` to prevent directory traversal.
-- `Yaml::read()` and `readWrapped()` enforce a 2 MB file size limit and check `is_readable()` before reading.
+## Optional Integrations
+
+- XOOPS may be absent at runtime. Check XOOPS objects with `instanceof` (`$xoopsUser instanceof \XoopsUser`), read config with `?? null`, and accept optional injected collaborators (e.g. `TokenExtension(?\XoopsSecurity $security = null)`) so tests run without a XOOPS install.
+- Ray functions are no-ops when Ray is not installed; keep it that way.
+- QR codes are generated locally (`chillerlan/php-qrcode`). The external fallback is used only when explicitly requested.
 
 ## Testing Guidelines
 
-- Test classes extend `\PHPUnit\Framework\TestCase` in the `Xmf\Test\` namespace.
-- Tests must be fully isolated — no XOOPS installation required. PHPStan stubs in `stubs/` provide type information only.
-- Name test methods `test{MethodName}` or `test{MethodName}{Scenario}`.
-- Use `try/finally` for temp file cleanup so files are removed even when assertions fail.
-- Assert `fopen()` return values with `$this->assertNotFalse($fh, '...')` before writing.
-- Suppress expected `trigger_error()` warnings with `@` (e.g., `@Yaml::read($oversizedFile)`).
-- Use `ReflectionMethod::setAccessible(true)` sparingly, only to test protected/private methods.
+- Test classes extend `\PHPUnit\Framework\TestCase` in `Xoops\SmartyExtensions\Test\`, organized by extension under `tests/Unit/Extension/`, with separate classes for larger features (pagination, QR).
+- Tests must be isolated: no XOOPS install, no network. Use the stubs in `tests/stubs/`.
+- For escaping regressions, assert the exact escaped output where practical, not just the absence of a tag.
+- Seeded randomness uses `\Random\Randomizer` with `\Random\Engine\Mt19937`, never `mt_srand()`/`mt_rand()` (SonarCloud flags them).
+- Use `try/finally` for temp file cleanup.
 
 ## Static Analysis
 
-PHPStan runs at level `max`. The baseline (`phpstan-baseline.neon`) tracks ~546 existing errors for incremental cleanup. New code must not introduce new PHPStan errors. Run `composer baseline` to regenerate after intentionally resolving baseline items. The baseline script backs up the current file, clears it, regenerates, and restores from backup on failure.
-
-Stubs in `stubs/` define XOOPS framework classes (`Xoops`, `XoopsModule`, `XoopsCache`, criteria classes, database handlers, `ModuleAdmin`, XOOPS 2.6 namespaced classes, language constants, etc.) so PHPStan can type-check XMF code without requiring a full XOOPS installation.
+PHPStan runs at level `max` over `src/` with `phpstan-baseline.neon`. New code must not add errors. `reportUnmatchedIgnoredErrors` is off because the Smarty 4 and 5 legs resolve types differently. Fix the code instead of adding baseline entries.
 
 ## CI Pipeline
 
-GitHub Actions runs a single consolidated job on every push and PR:
-
-- **PHP matrix:** 7.4–8.5, plus lowest-deps on 7.4
-- **Each run:** lint (non-blocking, pre-existing issues) + analyse + test
-- **Coverage:** PHP 8.3 with Xdebug, uploaded to Codecov
-
-Scrutinizer runs its own `php_analyzer` tool plus `composer ci` on PHP 7.4–8.5. It excludes `_archive/`, `tests/`, `vendor/`, `docs/`, and `stubs/`.
+- **GitHub Actions:** PHP 8.2 (plus lowest deps), 8.3, 8.4, 8.5. Each run: `composer validate`, lint (non-blocking), analyse, test.
+- **Coverage:** PHP 8.3 with Xdebug, uploaded to Codecov.
+- **Also:** SonarCloud (automatic analysis), Scrutinizer, CodeRabbit. The `sonarcloud.yml` and `qodana.yml` workflow jobs are guarded to `XOOPS/xmf` and skip here.
 
 ## Pull Request Checklist
 
-1. Code follows PSR-12 and passes `composer lint` (or `composer fix`).
-2. `composer analyse` passes with no new errors beyond the baseline.
-3. `composer test` passes on all PHP versions (7.4-8.5).
-4. New public methods have PHPDoc with `@param`, `@return`, and `@throws` tags.
-5. New functionality has corresponding unit tests in `tests/unit/`.
-6. Changes are documented in `CHANGELOG.md` under `[Unreleased]`.
-7. No hardcoded encoding strings — use the class `ENCODING` constant.
-8. File operations include proper error handling (exists -> size -> readable -> read -> check false).
+1. `composer lint`, `composer analyse` and `composer test` pass.
+2. New plugins have PHPDoc and unit tests in `tests/Unit/Extension/`.
+3. Output follows the escaping contract above.
+4. User-facing changes are documented in `CHANGELOG.md` under `[Unreleased]`; template-author-visible changes also update `docs/TUTORIAL.md` (see `.github/CONTRIBUTING.md`).
