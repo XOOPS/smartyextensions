@@ -331,6 +331,7 @@ NavigationExtension provides URL manipulation, breadcrumbs, pagination, and soci
 ```
 
 A route with an executable scheme such as `javascript:` or `data:` produces an empty string, so check the result when the route comes from user data.
+The `|escape` assumes Smarty's default `$escape_html` off; with it on, omit `|escape`.
 
 ### Canonical URLs
 
@@ -923,6 +924,8 @@ Builds a module-relative URL. When `XOOPS_URL` is defined, the output is a full 
 ```
 
 Direct output is HTML-escaped; an `assign`ed URL is raw, so escape it in the attribute.
+The `|escape` above is for Smarty's default `$escape_html` off; with `$escape_html` on,
+print `<{$articleUrl}>` without it (Smarty 4 would encode the `&` in the query string twice).
 
 Example output with `XOOPS_URL` = `https://example.com`: `https://example.com/modules/news/article.php?id=42`
 

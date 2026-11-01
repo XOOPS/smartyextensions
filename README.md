@@ -117,6 +117,8 @@ URL generation, breadcrumbs, pagination, and social sharing.
 <a href="<{$articleUrl|escape}>">Read more</a>
 ```
 
+With Smarty's `$escape_html` on, drop that `|escape`; Smarty 4 would encode the `&` in the query string twice.
+
 ---
 
 ### SecurityExtension
@@ -313,7 +315,7 @@ src/
 
 All extensions follow a consistent **assign contract**:
 
-- **Direct output** (no `assign` param): HTML-escaped with `htmlspecialchars($value, ENT_QUOTES, 'UTF-8')`.
+- **Direct output** (no `assign` param): HTML-escaped with `htmlspecialchars($value, ENT_QUOTES, 'UTF-8')`. `xo_get_config` and `get_session_data` add `ENT_SUBSTITUTE`, so invalid UTF-8 in a stored value becomes U+FFFD instead of an empty string.
 - **Assign path** (`assign` param present): raw value is stored in the template variable. The caller is responsible for escaping when interpolating into HTML (e.g. `href="<{$url|escape}>"`).
 
 This prevents double-escaping while maintaining XSS safety at every output point.
