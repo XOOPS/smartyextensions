@@ -100,7 +100,7 @@ final class NavigationExtension extends AbstractExtension
     private static function decodeAsAttribute(string $value): ?string
     {
         $decoded = \preg_replace_callback(
-            '/&(?:#x([0-9a-f]+);?|#([0-9]+);?|([a-z][a-z0-9]*;))/i',
+            '/&(?:#x([0-9a-f]+);?|#(\d+);?|([a-z][a-z0-9]*;))/i',
             static fn (array $m): string => ($m[3] ?? '') !== ''
                 ? \html_entity_decode('&' . $m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8')
                 : self::numericReferenceToChar($m[1], $m[2] ?? ''),
