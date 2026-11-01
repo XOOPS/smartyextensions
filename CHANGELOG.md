@@ -53,6 +53,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `$escape_html`, print them with `nofilter`.
   **Breaking:** remove any `|escape` after them, and pass a literal `£` / no-break
   space instead of `&pound;` / `&nbsp;` as currency symbol or number separator.
+- **`xo_get_config`** and **`get_session_data`** now HTML-escape their direct output,
+  and print nothing for an array value instead of `Array`. Invalid UTF-8 in that
+  output is replaced with U+FFFD. `assign` stays raw.
+  **Breaking:** remove any `|escape` after their direct output, or it is
+  double-encoded; keep escaping a raw `assign`ed value when you print it.
 - **`mask_email`** masks by character, not byte, so multibyte local parts are no
   longer cut mid-character.
 - **`base64_encode_file`, `get_file_size`, `get_mime_type`** reject stream wrappers,

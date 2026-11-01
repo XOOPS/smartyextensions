@@ -331,6 +331,7 @@ NavigationExtension provides URL manipulation, breadcrumbs, pagination, and soci
 ```
 
 A route with an executable scheme such as `javascript:` or `data:` produces an empty string, so check the result when the route comes from user data.
+The `|escape` assumes Smarty's default `$escape_html` off; with it on, omit `|escape`.
 
 ### Canonical URLs
 
@@ -875,11 +876,16 @@ XoopsCoreExtension provides template functions that interact with XOOPS configur
 
 ```smarty
 <{xo_get_config name="sitename" assign="siteName"}>
-<title><{$siteName}></title>
+<title><{$siteName|escape}></title>
 
 <{xo_get_config name="slogan" assign="slogan"}>
-<p><{$slogan}></p>
+<p><{$slogan|escape}></p>
 ```
+
+Direct output (`<{xo_get_config name="sitename"}>`) is already HTML-escaped; an
+`assign`ed value is raw, so escape it when you print it. The `|escape` above is for
+Smarty's default `$escape_html` off; with `$escape_html` on, print `<{$siteName}>`
+without it (Smarty 4 would encode it twice).
 
 ### Current user
 
@@ -914,8 +920,12 @@ Builds a module-relative URL. When `XOOPS_URL` is defined, the output is a full 
 
 ```smarty
 <{xo_module_url module="news" path="article.php" params=$queryParams assign="articleUrl"}>
-<a href="<{$articleUrl}>">Read article</a>
+<a href="<{$articleUrl|escape}>">Read article</a>
 ```
+
+Direct output is HTML-escaped; an `assign`ed URL is raw, so escape it in the attribute.
+The `|escape` above is for Smarty's default `$escape_html` off; with `$escape_html` on,
+print `<{$articleUrl}>` without it (Smarty 4 would encode the `&` in the query string twice).
 
 Example output with `XOOPS_URL` = `https://example.com`: `https://example.com/modules/news/article.php?id=42`
 
