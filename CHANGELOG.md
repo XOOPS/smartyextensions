@@ -41,10 +41,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   double-encoded; `pretty_print_json` output is for element text, not attributes.
 - **`format_date`, `relative_time`, `format_currency`, `number_format`, `mask_email`**
   and direct-output **`datetime_diff`** now return HTML-escaped text for element
-  content or quoted attributes, including the pass-through of unparsed input and
-  an unknown currency code echoed by ICU. Invalid UTF-8 in their output is now
-  replaced with U+FFFD; it was previously passed through unchanged. `datetime_diff`
-  `assign` stays raw. Under `$escape_html`, print
+  content or quoted attributes, including the unparsed input that `format_date`
+  and `relative_time` pass through and an unknown currency code echoed by ICU.
+  Invalid UTF-8 in their output is now replaced with U+FFFD; it was previously
+  passed through unchanged. `datetime_diff` `assign` stays raw. Under
+  `$escape_html`, print
   them with `nofilter`.
   **Breaking:** remove any `|escape` after them, and pass a literal `£` / no-break
   space instead of `&pound;` / `&nbsp;` as currency symbol or number separator.
