@@ -264,6 +264,9 @@ Wrappers around XOOPS globals and handlers.
 <{"_MI_NEWS_LATEST_TITLE"|translate}>
 ```
 
+An `assign`ed value is raw, so escape it when you print it. With Smarty's `$escape_html`
+on, drop that `|escape`: auto-escaping covers it, and Smarty 4 would encode it twice.
+
 ---
 
 ### RayDebugExtension
