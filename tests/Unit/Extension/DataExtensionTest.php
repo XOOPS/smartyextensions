@@ -350,6 +350,46 @@ final class DataExtensionTest extends TestCase
         unset($_SERVER['HTTP_REFERER']);
     }
 
+    // ---------------------------------------------------------------
+    //  get_session_data: direct output escaped, assign raw
+    // ---------------------------------------------------------------
+
+    #[Test]
+    public function getSessionDataEscapesDirectOutput(): void
+    {
+        $_SESSION['pref'] = '<img src=x onerror="alert(1)"> & \'q\'';
+        $result = $this->ext->getSessionData(['key' => 'pref'], $this->createMock(TemplateStub::class));
+        unset($_SESSION['pref']);
+
+        $this->assertSame('&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &#039;q&#039;', $result);
+    }
+
+    #[Test]
+    public function getSessionDataAssignsRawValue(): void
+    {
+        $_SESSION['pref'] = '<b>A & B</b>';
+        $tpl = $this->createMock(TemplateStub::class);
+        $tpl->expects($this->once())
+            ->method('assign')
+            ->with('p', '<b>A & B</b>');
+
+        $result = $this->ext->getSessionData(['key' => 'pref', 'assign' => 'p'], $tpl);
+        unset($_SESSION['pref']);
+
+        $this->assertSame('', $result);
+    }
+
+    #[Test]
+    public function getSessionDataReturnsEmptyForArrayOrMissingValue(): void
+    {
+        $_SESSION['cart'] = ['item' => 1];
+        $tpl = $this->createMock(TemplateStub::class);
+
+        $this->assertSame('', $this->ext->getSessionData(['key' => 'cart'], $tpl));
+        $this->assertSame('', $this->ext->getSessionData(['key' => 'missing'], $tpl));
+        unset($_SESSION['cart']);
+    }
+
     // ── Hardening regressions ───────────────────────
 
     #[Test]

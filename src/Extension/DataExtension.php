@@ -210,7 +210,11 @@ final class DataExtension extends AbstractExtension
             return '';
         }
 
-        return (string) ($result ?? '');
+        if (!\is_scalar($result) && !$result instanceof \Stringable) {
+            return '';
+        }
+
+        return \htmlspecialchars((string) $result, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     // ---------------------------------------------------------------

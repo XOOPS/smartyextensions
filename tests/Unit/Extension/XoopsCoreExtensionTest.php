@@ -103,6 +103,34 @@ final class XoopsCoreExtensionTest extends TestCase
         $this->assertSame('', $result);
     }
 
+    #[Test]
+    public function xoGetConfigEscapesDirectOutput(): void
+    {
+        $GLOBALS['xoopsConfig'] = ['sitename' => '<script>"Tom & Jerry\'s"</script>'];
+        $result = $this->ext->xoGetConfig(['name' => 'sitename'], $this->tpl());
+        $this->assertSame('&lt;script&gt;&quot;Tom &amp; Jerry&#039;s&quot;&lt;/script&gt;', $result);
+    }
+
+    #[Test]
+    public function xoGetConfigAssignsRawValue(): void
+    {
+        $GLOBALS['xoopsConfig'] = ['sitename' => '<b>A & B</b>'];
+        $tpl = $this->createMock(TemplateStub::class);
+        $tpl->expects($this->once())
+            ->method('assign')
+            ->with('site', '<b>A & B</b>');
+
+        $this->assertSame('', $this->ext->xoGetConfig(['name' => 'sitename', 'assign' => 'site'], $tpl));
+    }
+
+    #[Test]
+    public function xoGetConfigReturnsEmptyForArrayValue(): void
+    {
+        $GLOBALS['xoopsConfig'] = ['language_list' => ['english', 'french']];
+        $result = $this->ext->xoGetConfig(['name' => 'language_list'], $this->tpl());
+        $this->assertSame('', $result);
+    }
+
     // ──────────────────────────────────────────────
     // xo_get_current_user
     // ──────────────────────────────────────────────
