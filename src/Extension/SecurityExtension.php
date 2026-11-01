@@ -232,16 +232,18 @@ final class SecurityExtension extends AbstractExtension
     {
         $parts = \explode('@', $email, 2);
         if (\count($parts) !== 2) {
-            return $email;
+            return \htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         $local = $parts[0];
         $domain = $parts[1];
 
-        $visibleChars = \max(1, (int) \ceil(\strlen($local) / 3));
-        $masked = \substr($local, 0, $visibleChars) . \str_repeat('*', \max(3, \strlen($local) - $visibleChars));
+        // Count characters, not bytes: a cut multibyte character makes htmlspecialchars() return ''
+        $length = \mb_strlen($local, 'UTF-8');
+        $visibleChars = \max(1, (int) \ceil($length / 3));
+        $masked = \mb_substr($local, 0, $visibleChars, 'UTF-8') . \str_repeat('*', \max(3, $length - $visibleChars));
 
-        return $masked . '@' . $domain;
+        return \htmlspecialchars($masked . '@' . $domain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**

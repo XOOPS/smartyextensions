@@ -39,6 +39,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`format_phone_number`** (unrecognised input) and **`pretty_print_json`** now return
   HTML-escaped text. **Breaking:** remove any `|escape` after them, or the output is
   double-encoded; `pretty_print_json` output is for element text, not attributes.
+- **`format_date`, `relative_time`, `format_currency`, `number_format`, `mask_email`**
+  and direct-output **`datetime_diff`** now return HTML-escaped text for element
+  content or quoted attributes, including the unparsed input that `format_date`
+  and `relative_time` pass through and an unknown currency code echoed by ICU.
+  Invalid UTF-8 in their output is now replaced with U+FFFD; it was previously
+  passed through unchanged. `datetime_diff` `assign` stays raw. Under
+  `$escape_html`, print
+  them with `nofilter`.
+  **Breaking:** remove any `|escape` after them, and pass a literal `£` / no-break
+  space instead of `&pound;` / `&nbsp;` as currency symbol or number separator.
+- **`mask_email`** masks by character, not byte, so multibyte local parts are no
+  longer cut mid-character.
 - **`base64_encode_file`, `get_file_size`, `get_mime_type`** reject stream wrappers,
   UNC and `//host` paths before touching the filesystem.
 

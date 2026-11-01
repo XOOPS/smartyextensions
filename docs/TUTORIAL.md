@@ -262,8 +262,10 @@ Uses the ICU NumberFormatter when the `intl` extension is available:
 <{$product.price|format_currency:"EUR":"de_DE"}>
 
 <{* Fallback symbol when intl is not loaded *}>
-<{$product.price|format_currency:"GBP":"en_GB":"&pound;"}>
+<{$product.price|format_currency:"GBP":"en_GB":"£"}>
 ```
+
+Date, number and currency modifiers return HTML-escaped text, so pass literal characters (`£`, a no-break space) rather than entities such as `&pound;` or `&nbsp;`, and do not apply `|escape` after them.
 
 ### Number formatting
 
