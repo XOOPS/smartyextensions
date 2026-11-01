@@ -41,7 +41,7 @@ On Windows, `.\scripts\ci.ps1` runs the same steps with lint as advisory; `-Skip
 
 ## Coding Conventions
 
-- Every PHP file starts with `declare(strict_types=1);` and follows PSR-12 (`phpcs.xml`).
+- Every PHP file in `src/` and `tests/` starts with `declare(strict_types=1);` and follows PSR-12 (`phpcs.xml`). The analysis stubs in `stubs/` mirror third-party signatures and are exempt; don't add strict types to them.
 - Class docblocks carry `@copyright` and `@license` tags.
 - Use `self::` for constants defined by the class.
 - Extension classes are `final`, extend `AbstractExtension`, and return `name => callable` maps from `getModifiers()`, `getFunctions()` and `getBlockHandlers()`.
@@ -52,9 +52,10 @@ On Windows, `.\scripts\ci.ps1` runs the same steps with lint as advisory; `-Skip
 
 The full contract is in the `AbstractExtension` class docblock.
 
-- Text functions escape direct output with `htmlspecialchars()` using `ENT_QUOTES` and `'UTF-8'`. Add `ENT_SUBSTITUTE` where the value may hold invalid UTF-8: without it the whole string comes back empty.
-- With an `assign` parameter, text functions store the raw value; only direct output is escaped.
-- HTML-generating functions (`createButton`, `renderFormErrors`, `displayError`) return or assign finished markup with its dynamic parts escaped. Their docblocks say "exception to the raw-in-assign contract"; templates print the assigned variable with `nofilter`.
+- Escaping is decided per plugin, not per plugin type. Plugins that produce a finished display value (formatted dates, masked or sanitised strings, functions that print a plain-text value) escape their direct output with `htmlspecialchars()` using `ENT_QUOTES` and `'UTF-8'`. Add `ENT_SUBSTITUTE` where the value may hold invalid UTF-8: without it the whole string comes back empty. With an `assign` parameter, functions store the raw value; only direct output is escaped.
+- The text-transform modifiers in `TextExtension` are not display values: `excerpt`, `truncate_words`, `reading_time` and `pluralize` return unescaped text that the template escapes, and `nl2p` and `highlight_text` return markup by design. Don't add escaping to them.
+- Known gaps on `master`: `format_date`, `relative_time` and `datetime_diff` return caller text unescaped, and `mask_email` cuts by bytes. The fix is pending in PR #38. Treat the rule above as binding for new and changed code, and don't flag these four as regressions in unrelated PRs.
+- Functions that build HTML return or assign the finished markup with its dynamic parts escaped, not a raw value: `createButton`, `renderFormErrors`, `displayError`, `embedPdf`, `generateMetaTags`, `renderBreadcrumbs`, `renderPagination`, `renderQrCode`, `renderAlert`, `xoAvatar`, `generateCsrfToken`. Templates print the assigned variable with `nofilter`; don't escape it again. When you add such a function, add it to this list and mark its docblock "exception to the raw-in-assign contract".
 - Values in another format are built with that format's encoder (`http_build_query`/`urlencode`, `json_encode`, `fputcsv`), then HTML-escaped when printed into the page: `generate_url` and `array_to_csv` direct output use `ENT_QUOTES`, `pretty_print_json` uses `ENT_NOQUOTES` for `<pre>` text. `assign` still stores the raw value. Only a standalone document the function builds whole, such as the sitemap XML, uses its own escaping (`ENT_XML1`) instead.
 - Block handlers receive `$content` already rendered by Smarty. Don't re-escape it.
 - Validate externally supplied URLs for `href`, `src` or `action` with `AbstractExtension::isSafeUrl()` before escaping. URLs the library builds itself, such as the QR code `data:` URI, follow their own construction rules.
@@ -93,4 +94,4 @@ PHPStan runs at level `max` over `src/` with `phpstan-baseline.neon`. New code m
 1. `composer lint`, `composer analyse` and `composer test` pass.
 2. New plugins have PHPDoc and unit tests in `tests/Unit/Extension/`.
 3. Output follows the escaping contract above.
-4. User-facing changes are documented in `CHANGELOG.md` under `[Unreleased]` and in `README.md`.
+4. User-facing changes are documented in `CHANGELOG.md` under `[Unreleased]`; template-author-visible changes also update `docs/TUTORIAL.md` (see `.github/CONTRIBUTING.md`).
