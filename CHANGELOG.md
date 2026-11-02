@@ -5,7 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased]
+## [2.0.0 Beta1] — 2026-11-02
+
+Major version: several plugins now escape their own output, so templates that
+add `|escape` after them double-encode. See the **Breaking** notes below.
+Consumers pinned to `^1.x` (XOOPS core: `^1.3`) must raise their constraint to
+opt in.
 
 ### Security
 
@@ -212,6 +217,6 @@ First stable release of the 1.3 line. Existing plugin behaviour is unchanged sin
 
 ---
 
-[Unreleased]: https://github.com/mambax7/smartyextensions/compare/v1.2.0...HEAD
+[2.0.0 Beta1]: https://github.com/XOOPS/smartyextensions/compare/v1.3.0...v2.0.0-Beta1
 [1.2.0]: https://github.com/mambax7/smartyextensions/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mambax7/smartyextensions/releases/tag/v1.1.0
