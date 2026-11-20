@@ -153,7 +153,7 @@ final class TranslationExtensionTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // Constant fallback (engine absent or not initialised)
+    // Constant fallback (engine absent or not initialized)
     // ──────────────────────────────────────────────
 
     #[Test]
@@ -302,7 +302,7 @@ final class TranslationExtensionTest extends TestCase
             'zero'            => [0, '<i>'],
             'true'            => [true, '&lt;i&gt;'],
             'string on'       => ['on', '&lt;i&gt;'],
-            'unrecognised'    => ['banana', '&lt;i&gt;'],
+            'unrecognized'    => ['banana', '&lt;i&gt;'],
             'null'            => [null, '&lt;i&gt;'],
             'array'           => [['no'], '&lt;i&gt;'],
         ];
@@ -310,7 +310,7 @@ final class TranslationExtensionTest extends TestCase
 
     #[Test]
     #[DataProvider('escapeValues')]
-    public function onlyARecognisedFalseDisablesEscaping(mixed $escape, string $expected): void
+    public function onlyARecognizedFalseDisablesEscaping(mixed $escape, string $expected): void
     {
         $out = $this->ext->xoTrans(['key' => '_SE_TR_HELLO', 'name' => '<i>', 'escape' => $escape], $this->tpl());
 
@@ -359,7 +359,7 @@ final class TranslationExtensionTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // Engine path (Xmf\I18n\Translation initialised)
+    // Engine path (Xmf\I18n\Translation initialized)
     // ──────────────────────────────────────────────
 
     #[Test]
@@ -485,7 +485,7 @@ final class TranslationExtensionTest extends TestCase
     }
 
     #[Test]
-    public function debugModeReportsAMissingKeyWithEmptyLocaleWhenTheEngineIsNotInitialised(): void
+    public function debugModeReportsAMissingKeyWithEmptyLocaleWhenTheEngineIsNotInitialized(): void
     {
         $ext = new TranslationExtension(true);
 
@@ -582,7 +582,7 @@ final class TranslationExtensionTest extends TestCase
     }
 
     #[Test]
-    public function modifierUsesTheEngineWhenInitialised(): void
+    public function modifierUsesTheEngineWhenInitialized(): void
     {
         Translation::$initialized = true;
         Translation::$catalog     = ['k' => 'Translated'];

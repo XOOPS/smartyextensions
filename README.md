@@ -295,6 +295,7 @@ the `core.i18n.missing` preload event and `file=` raises a deprecation notice.
 | `default` | Text to use when the key does not resolve |
 | `assign` | Template variable to store the result in, instead of printing it |
 | `escape` | `false` passes placeholder values and `default` unescaped |
+| `locale`, `context` | Reserved and ignored; a placeholder with one of these names goes in `params` |
 | any other | A placeholder value: `name=$author` fills `{name}` |
 
 ```smarty

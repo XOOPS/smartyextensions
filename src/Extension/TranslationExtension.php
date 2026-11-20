@@ -9,7 +9,7 @@ use Xoops\SmartyExtensions\AbstractExtension;
 /**
  * XOOPS 2.8.0 i18n Smarty surface: `<{xoTrans}>`/`<{trans}>`/`<{xoT}>` and the
  * `xoTrans` modifier, backed by {@see \Xmf\I18n\Translation} when the engine
- * is initialised, degrading to a hardened legacy-constant lookup otherwise
+ * is initialized, degrading to a hardened legacy-constant lookup otherwise
  * (xmf 1.3.x sites — total no-op guarded via `class_exists(..., true)` and
  * {@see \Xmf\I18n\Translation::isInitialized()}).
  *
@@ -90,11 +90,11 @@ final class TranslationExtension extends AbstractExtension
         $escapeFlag = $params['escape'] ?? null;
         if (is_scalar($escapeFlag)) {
             // Only a scalar is read. filter_var() would coerce a null to '',
-            // a RECOGNISED false, and wrongly disable escaping; an object
+            // a RECOGNIZED false, and wrongly disable escaping; an object
             // could throw while being converted and break rendering.
             $validated = filter_var($escapeFlag, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            // An invalid/unrecognised value must never silently disable
-            // escaping: only an explicit, recognised false does.
+            // An invalid/unrecognized value must never silently disable
+            // escaping: only an explicit, recognized false does.
             $escape = null === $validated || $validated;
         }
         if ($escape) {
@@ -233,7 +233,7 @@ final class TranslationExtension extends AbstractExtension
 
     /**
      * Legacy-constant degrade path used only when the Xmf\I18n engine is
-     * absent or uninitialised. Stricter than
+     * absent or uninitialized. Stricter than
      * {@see XoopsCoreExtension::translate()}, which resolves any defined
      * constant: only underscore-prefixed language constants are resolvable
      * here — never an arbitrary one (XOOPS_DB_PASS, XOOPS_ROOT_PATH, …).

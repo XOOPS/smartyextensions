@@ -42,6 +42,7 @@ use Xoops\SmartyExtensions\Extension\FormExtension;
 use Xoops\SmartyExtensions\Extension\XoopsCoreExtension;
 use Xoops\SmartyExtensions\Extension\RayDebugExtension;
 use Xoops\SmartyExtensions\Extension\AssetExtension;
+use Xoops\SmartyExtensions\Extension\TranslationExtension;
 
 $registry = new ExtensionRegistry();
 $registry->add(new TextExtension());
@@ -53,6 +54,7 @@ $registry->add(new FormExtension($xoopsSecurity));
 $registry->add(new XoopsCoreExtension());
 $registry->add(new RayDebugExtension());
 $registry->add(new AssetExtension());
+$registry->add(new TranslationExtension());
 
 $registry->registerAll($smarty);
 ```
@@ -829,7 +831,7 @@ Use the `xo_permission` block to conditionally show content:
 <{$userInput|sanitize_string}>
 
 <{* URL sanitization *}>
-<a href="<{$url|sanitize_url}>">Link</a>
+<a href="<{$url|sanitize_url nofilter}>">Link</a>
 
 <{* Filename sanitization (strips everything except A-Za-z0-9-_.) *}>
 <{$uploadName|sanitize_filename}>
@@ -838,7 +840,7 @@ Use the `xo_permission` block to conditionally show content:
 <{$value|sanitize_string_for_xml}>
 ```
 
-`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string. The accepted URL is returned HTML-escaped (`&` becomes `&amp;`, quotes become `&quot;`), ready to drop into an attribute — do not add `|escape` after it.
+`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string. The accepted URL is returned HTML-escaped (`&` becomes `&amp;`, quotes become `&quot;`), ready to drop into an attribute — do not add `|escape` after it. The `nofilter` in the example keeps Smarty's `$escape_html` from escaping it a second time (`&amp;amp;`), and changes nothing on a site where that setting is off.
 
 `form_open`, `form_input` (`src`, `formaction`), `embed_pdf`, `render_breadcrumbs` and `render_pagination` apply the same scheme check: an unsafe `action` renders as `action=""`, an unsafe PDF URL renders nothing, an unsafe breadcrumb becomes plain text, and an unsafe pagination pattern links to `#`.
 
@@ -1002,12 +1004,14 @@ printed as it is: with `<{$title|escape}>` the visitor would read `&amp;` where 
 has `&amp;` for an ampersand. The `nofilter` in the example does the same on a site that has
 Smarty's `$escape_html` on, and changes nothing where it is off.
 
-Escaping makes a value safe as text and inside a quoted attribute. It does not make a web
-address safe: `javascript:alert(1)` has nothing to escape. Keep addresses out of the translated
-text and write the link in the template:
+Escaping makes a value safe as text and inside a quoted attribute that holds plain text, such
+as `title` or `alt`. It does not make a value safe as script or style: in an `onclick` or
+`style` attribute the browser decodes the entities before it runs the code. It does not make a
+web address safe either: `javascript:alert(1)` has nothing to escape. Keep addresses out of the
+translated text and write the link in the template:
 
 ```smarty
-<a href="<{$url|sanitize_url}>"><{xoTrans key="_MI_NEWS_MORE"}></a>
+<a href="<{$url|sanitize_url nofilter}>"><{xoTrans key="_MI_NEWS_MORE"}></a>
 ```
 
 Unlike `translate`, these tags read only language constants (`_UPPER_CASE` names), never
