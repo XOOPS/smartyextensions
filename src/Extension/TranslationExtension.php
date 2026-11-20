@@ -1,0 +1,353 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Xoops\SmartyExtensions\Extension;
+
+use Xoops\SmartyExtensions\AbstractExtension;
+
+/**
+ * XOOPS 2.8.0 i18n Smarty surface: `<{xoTrans}>`/`<{trans}>`/`<{xoT}>` and the
+ * `xoTrans` modifier, backed by {@see \Xmf\I18n\Translation} when the engine
+ * is initialised, degrading to a hardened legacy-constant lookup otherwise
+ * (xmf 1.3.x sites — total no-op guarded via `class_exists(..., true)` and
+ * {@see \Xmf\I18n\Translation::isInitialized()}).
+ *
+ * ESCAPING (ADR-003) — deliberate exception to {@see AbstractExtension}'s
+ * escape-on-direct-output contract: the resolved CATALOG STRING is always
+ * emitted RAW (translated strings legitimately carry markup — 24
+ * markup-bearing core constants, 99-Addendum §2.1); only the ad-hoc
+ * PLACEHOLDER VALUES substituted into it are escaped (unless `escape=false`
+ * is passed). The assigned value (`assign=`) is likewise raw per the
+ * standing assign contract in {@see AbstractExtension}.
+ *
+ * @copyright (c) 2000-2026 XOOPS Project (https://xoops.org)
+ * @license   GNU GPL 2 (https://www.gnu.org/licenses/gpl-2.0.html)
+ */
+final class TranslationExtension extends AbstractExtension
+{
+    /** @var list<string> params consumed by xoTrans() itself, never treated as ad-hoc {name} placeholders */
+    private const RESERVED_PARAMS = [
+        'key', 'id', 'domain', 'file', 'dirname', 'params', 'count',
+        'default', 'assign', 'locale', 'context', 'escape',
+    ];
+
+    public function __construct(private readonly bool $debug = false)
+    {
+    }
+
+    public function getFunctions(): array
+    {
+        return [
+            'xoTrans' => $this->xoTrans(...),
+            'trans'   => $this->xoTrans(...),
+            'xoT'     => $this->xoTrans(...),
+        ];
+    }
+
+    public function getModifiers(): array
+    {
+        return [
+            'xoTrans' => $this->xoTransModifier(...),
+        ];
+    }
+
+    /**
+     * Usage: <{xoTrans key="_MI_NEWS_TITLE" domain="news" assign="title"}>
+     *        <{xoTrans key="_MI_NEWS_BY" name=$author}>
+     *        <{xoTrans key="_MI_NEWS_MISSING" default="News"}>
+     *
+     * @param array<array-key,mixed> $params
+     */
+    public function xoTrans(array $params, object $template): string
+    {
+        $key = $this->toAttributeString($params['key'] ?? $params['id'] ?? '');
+        if ('' === $key) {
+            return '';
+        }
+
+        $domain = $this->toAttributeString($params['domain'] ?? $params['file'] ?? 'main');
+        if (array_key_exists('file', $params) && !array_key_exists('domain', $params)) {
+            $this->deprecateFileParam();
+        }
+
+        $dirname = $this->toAttributeString($params['dirname'] ?? '');
+        if ('' === $dirname && ($GLOBALS['xoopsModule'] ?? null) instanceof \XoopsModule) {
+            $dirname = $this->toAttributeString($GLOBALS['xoopsModule']->getVar('dirname', 'n'));
+        }
+
+        $count = (array_key_exists('count', $params) && is_numeric($params['count'])) ? (int) $params['count'] : null;
+
+        $values = is_array($params['params'] ?? null) ? $params['params'] : [];
+        foreach ($params as $name => $value) {
+            if (!is_string($name) || in_array($name, self::RESERVED_PARAMS, true)) {
+                continue;
+            }
+            $values[$name] = $value;
+        }
+        // locale=/context= are reserved no-ops: parsed above only to be
+        // excluded from $values, never read or passed through.
+
+        $escape     = true;
+        $escapeFlag = $params['escape'] ?? null;
+        if (is_scalar($escapeFlag)) {
+            // Only a scalar is read. filter_var() would coerce a null to '',
+            // a RECOGNISED false, and wrongly disable escaping; an object
+            // could throw while being converted and break rendering.
+            $validated = filter_var($escapeFlag, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            // An invalid/unrecognised value must never silently disable
+            // escaping: only an explicit, recognised false does.
+            $escape = null === $validated || $validated;
+        }
+        if ($escape) {
+            $values = $this->escapeValues($values);
+        }
+
+        if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
+            $out = \Xmf\I18n\Translation::translate($dirname, $key, $values, $domain, $count);
+        } else {
+            $out = $this->constantFallback($key, $values);
+        }
+
+        if ($out === $key && $this->debug) {
+            $this->fireMissingEvent($dirname, $domain, $key);
+        }
+
+        if ($out === $key && array_key_exists('default', $params)) {
+            $out = $this->toAttributeString($params['default']);
+        }
+
+        if (!empty($params['assign']) && method_exists($template, 'assign')) {
+            $template->assign($this->toAttributeString($params['assign']), $out);
+
+            return '';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Same runtime as {@see xoTrans()}, no params, no escaping, no default.
+     *
+     * Usage: <{"_MD_X"|xoTrans:'news'}>
+     */
+    public function xoTransModifier(string $key, string $dirname = '', string $domain = 'main'): string
+    {
+        if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
+            return \Xmf\I18n\Translation::translate($dirname, $key, [], $domain);
+        }
+
+        return $this->constantFallback($key, []);
+    }
+
+    /**
+     * Smarty 4 registration path (registerPlugin), non-clobbering: a
+     * plugin name already registered under $smarty is left alone and the
+     * collision is logged rather than silently overwritten or fatal.
+     *
+     * Under Smarty 5,
+     * {@see \Xoops\SmartyExtensions\ExtensionRegistry::registerAll()} takes
+     * the addExtension()/Smarty5Adapter path and this method is not called.
+     *
+     * The functions are registered non-cacheable, as in
+     * {@see AbstractExtension::register()}: the result depends on the
+     * visitor's language, so a cached page must run them again.
+     *
+     * @param \Smarty|\Smarty\Smarty $smarty
+     */
+    public function register(object $smarty): void
+    {
+        $registered = $smarty->registered_plugins ?? null;
+
+        foreach (['function' => $this->getFunctions(), 'modifier' => $this->getModifiers()] as $type => $plugins) {
+            $taken = is_array($registered) && is_array($registered[$type] ?? null) ? $registered[$type] : [];
+            foreach ($plugins as $name => $callback) {
+                if (isset($taken[$name])) {
+                    self::logCollision($type, $name);
+                    continue;
+                }
+                $smarty->registerPlugin($type, $name, $callback, 'function' !== $type);
+            }
+        }
+    }
+
+    /**
+     * Smarty-5 probe: CoreExtension/DefaultExtension/BCPluginsAdapter are
+     * pushed into the extension list before any addExtension() call, so a
+     * name collision means OUR tag silently loses (Smarty resolves the
+     * FIRST match) rather than failing loudly. Call this BEFORE
+     * ExtensionRegistry::registerAll() and log any hit.
+     *
+     * @param \Smarty|\Smarty\Smarty $smarty
+     *
+     * @return list<string> e.g. ['function:xoTrans', 'modifier:xoTrans']
+     */
+    public static function probeCollisions(object $smarty): array
+    {
+        $hits = [];
+
+        foreach (['xoTrans', 'trans', 'xoT'] as $name) {
+            if (method_exists($smarty, 'getFunctionHandler') && null !== $smarty->getFunctionHandler($name)) {
+                $hits[] = 'function:' . $name;
+            }
+        }
+
+        if (method_exists($smarty, 'getModifierCallback') && null !== $smarty->getModifierCallback('xoTrans')) {
+            $hits[] = 'modifier:xoTrans';
+        }
+
+        return $hits;
+    }
+
+    /**
+     * Legacy-constant degrade path used only when the Xmf\I18n engine is
+     * absent or uninitialised. Stricter than
+     * {@see XoopsCoreExtension::translate()}, which resolves any defined
+     * constant: only underscore-prefixed language constants are resolvable
+     * here — never an arbitrary one (XOOPS_DB_PASS, XOOPS_ROOT_PATH, …).
+     *
+     * @param array<array-key,mixed> $values
+     */
+    private function constantFallback(string $key, array $values): string
+    {
+        // \z (not $) so a trailing newline in $key cannot slip past the anchor.
+        if (1 !== preg_match('/^_[A-Z][A-Z0-9_]*\z/', $key) || !defined($key)) {
+            return $key;
+        }
+        $value = constant($key);
+        if (!is_string($value)) {
+            // Returned as it is, without placeholders, so the caller still
+            // sees a miss and can apply default= and report it.
+            return $key;
+        }
+
+        $map = [];
+        foreach ($values as $name => $v) {
+            if (!is_string($name)) {
+                continue;
+            }
+            try {
+                $map['{' . $name . '}'] = $this->stringify($v);
+            } catch (\Throwable) {
+                // A throwing Stringable::__toString() must never break
+                // rendering — leave this token untouched instead.
+                continue;
+            }
+        }
+
+        // One pass, so a token inside an inserted value is not replaced again.
+        return strtr($value, $map);
+    }
+
+    /**
+     * HTML-escape every scalar and Stringable value, at any array depth.
+     *
+     * @param array<array-key,mixed> $values
+     *
+     * @return array<array-key,mixed>
+     */
+    private function escapeValues(array $values): array
+    {
+        $out = [];
+        foreach ($values as $name => $value) {
+            if (is_array($value)) {
+                $out[$name] = $this->escapeValues($value);
+                continue;
+            }
+            if (!is_scalar($value) && !($value instanceof \Stringable)) {
+                $out[$name] = $value;
+                continue;
+            }
+            try {
+                $out[$name] = htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            } catch (\Throwable) {
+                // A throwing Stringable::__toString() must never break
+                // rendering. The value is dropped, not passed on: a second
+                // conversion could succeed and would then go in unescaped.
+                // Its token stays in the text.
+            }
+        }
+
+        return $out;
+    }
+
+    private function stringify(mixed $value): string
+    {
+        if (is_scalar($value) || $value instanceof \Stringable) {
+            return (string) $value;
+        }
+
+        return '';
+    }
+
+    /**
+     * Coerce a raw Smarty tag attribute to a scalar string, never raising a
+     * PHP error/warning. Anything but null, a scalar or a Stringable is
+     * treated as absent (empty string) rather than "Array to string
+     * conversion" or an object-to-string Error — a malformed attribute value
+     * must never break rendering.
+     */
+    private function toAttributeString(mixed $value): string
+    {
+        if (null !== $value && !is_scalar($value) && !($value instanceof \Stringable)) {
+            return '';
+        }
+
+        try {
+            return (string) $value;
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function deprecateFileParam(): void
+    {
+        if (!$this->debug) {
+            return;
+        }
+        try {
+            trigger_error('<{xoTrans file=…}> is deprecated; use domain=.', E_USER_DEPRECATED);
+        } catch (\Throwable) {
+            // A deprecation notice must never break rendering.
+        }
+    }
+
+    private function fireMissingEvent(string $dirname, string $domain, string $key): void
+    {
+        if (!class_exists(\XoopsPreload::class)) {
+            return;
+        }
+        try {
+            $locale = '';
+            if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
+                $locale = \Xmf\I18n\Translation::getInstance()?->context()->tag ?? '';
+            }
+            \XoopsPreload::getInstance()->triggerEvent('core.i18n.missing', [[
+                'dirname' => $dirname,
+                'domain'  => $domain,
+                'key'     => $key,
+                'locale'  => $locale,
+            ]]);
+        } catch (\Throwable) {
+            // Event dispatch must never break rendering.
+        }
+    }
+
+    private static function logCollision(string $type, string $name): void
+    {
+        $message = "xoTrans {$type} collision: '{$name}' already registered.";
+
+        try {
+            if (isset($GLOBALS['xoopsLogger']) && is_object($GLOBALS['xoopsLogger']) && method_exists($GLOBALS['xoopsLogger'], 'addExtra')) {
+                $GLOBALS['xoopsLogger']->addExtra('i18n', $message);
+
+                return;
+            }
+
+            trigger_error($message, E_USER_NOTICE);
+        } catch (\Throwable) {
+            // Reporting must not stop the remaining plugins from registering
+            // (an error handler may turn the notice into an exception).
+        }
+    }
+}

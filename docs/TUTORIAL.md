@@ -960,6 +960,47 @@ The `translate` modifier looks up a XOOPS language constant:
 <h1><{"_MI_NEWS_TITLE"|translate}></h1>
 ```
 
+### Translation tags
+
+`xoTrans` translates a key through the XMF translation engine (XMF 1.5 and later). `trans` and
+`xoT` are shorter names for the same tag. On a site without the engine, a key that is a language
+constant (`_MI_NEWS_TITLE`) is read from the constant, so the same template works on both.
+
+```smarty
+<h1><{xoTrans key="_MI_NEWS_TITLE"}></h1>
+
+<{* A {name} placeholder in the translation is filled from the attribute of that name *}>
+<p><{xoTrans key="_MI_NEWS_BY" name=$author}></p>
+
+<{* Text to show when the key has no translation *}>
+<{xoTrans key="_MI_NEWS_MISSING" default="News"}>
+
+<{* Plural form by number; catalog of another module and domain *}>
+<{xoTrans key="comments.count" count=$total dirname="news" domain="blocks"}>
+
+<{* Store the result instead of printing it *}>
+<{nocache}>
+<{xoTrans key="_MI_NEWS_TITLE" assign="title"}>
+<title><{$title|escape}></title>
+<{/nocache}>
+```
+
+The modifier form takes no placeholders: `<{"_MD_NEWS_MORE"|xoTrans:'news'}>`.
+
+**Output caching.** The tag runs again for every visitor, also on a cached page, so each one
+gets their own language. Two forms do not: the tags that read an `assign`ed result, and the
+modifier. On a page that is output-cached and shown in more than one language, wrap them in
+`<{nocache}>…<{/nocache}>` as above.
+
+**Escaping.** The translation itself is printed as it is, because translations may contain
+markup such as `<strong>`. The placeholder values are HTML-escaped, so `name=$author` is safe
+with a name a visitor typed. Pass `escape=false` only for a value that is already safe HTML.
+A key without a translation is printed as it is, and so is `default`: never pass visitor input
+as `key` or `default`.
+
+Unlike `translate`, these tags read only language constants (`_UPPER_CASE` names), never
+another constant.
+
 ### Debug output
 
 Only renders when XOOPS debug mode is active:

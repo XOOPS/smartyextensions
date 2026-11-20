@@ -19,3 +19,4 @@ foreach ($autoloadPaths as $path) {
 require_once __DIR__ . '/stubs/TemplateStub.php';
 require_once __DIR__ . '/stubs/SmartyExtensionBase.php';
 require_once __DIR__ . '/stubs/XoopsStubs.php';
+require_once __DIR__ . '/stubs/XmfI18nStubs.php';

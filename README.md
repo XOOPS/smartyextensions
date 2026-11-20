@@ -271,6 +271,48 @@ on, drop that `|escape`: auto-escaping covers it, and Smarty 4 would encode it t
 
 ---
 
+### TranslationExtension
+
+Translation tags for the XMF translation engine (`Xmf\I18n\Translation`, XMF 1.5 and later).
+Without the engine, a key that is a language constant (`_MI_NEWS_TITLE`) is resolved from the
+constant, so the same template works on older sites. This package does not require XMF.
+
+**Constructor**: `new TranslationExtension(bool $debug = false)`. In debug mode a missing key fires
+the `core.i18n.missing` preload event and `file=` raises a deprecation notice.
+
+| Name | Type | Description |
+|---|---|---|
+| `xoTrans` | function | Translate `key`; `trans` and `xoT` are aliases |
+| `xoTrans` | modifier | `<{"key"\|xoTrans:'dirname':'domain'}>`, no placeholders |
+
+| Attribute | Meaning |
+|---|---|
+| `key` (or `id`) | Translation key or language constant |
+| `domain` | Catalog domain, default `main` (`file` is a deprecated alias) |
+| `dirname` | Module directory, default: the current module |
+| `count` | Number for plural selection |
+| `params` | Array of placeholder values |
+| `default` | Text to use when the key does not resolve |
+| `assign` | Template variable to store the result in, instead of printing it |
+| `escape` | `false` passes placeholder values unescaped |
+| any other | A placeholder value: `name=$author` fills `{name}` |
+
+```smarty
+<{xoTrans key="_MI_NEWS_TITLE" domain="news" assign="title"}>
+<{xoTrans key="_MI_NEWS_BY" name=$author}>
+<{xoTrans key="_MI_NEWS_MISSING" default="News"}>
+<{"_MD_NEWS_MORE"|xoTrans:'news'}>
+```
+
+**Escaping.** The translated string is printed as it is, because translations may contain
+markup. Only the placeholder values are HTML-escaped. A key that does not resolve is printed
+as it is too, and so is `default`: do not pass visitor input as `key` or `default`.
+
+On Smarty 5, call `TranslationExtension::probeCollisions($smarty)` before `registerAll()`: it lists
+the tag names another extension already answers, since Smarty uses the first match without a warning.
+
+---
+
 ### RayDebugExtension
 
 Zero-cost debug output via [spatie/ray](https://spatie.be/products/ray). All functions and the modifier silently no-op when Ray is not installed — no runtime dependency.
@@ -302,6 +344,7 @@ src/
     ├── DataExtension.php
     ├── AssetExtension.php
     ├── XoopsCoreExtension.php
+    ├── TranslationExtension.php
     └── RayDebugExtension.php
 ```
 

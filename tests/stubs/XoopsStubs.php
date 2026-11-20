@@ -109,6 +109,34 @@ if (!class_exists('XoopsModule', false)) {
     }
 }
 
+if (!class_exists('XoopsPreload', false)) {
+    class XoopsPreload
+    {
+        /** @var list<array{name: string, args: array<array-key, mixed>}> events triggered since the last reset */
+        public static array $events = [];
+
+        public static bool $throw = false;
+
+        private static ?self $instance = null;
+
+        public static function getInstance(): self
+        {
+            return self::$instance ??= new self();
+        }
+
+        /**
+         * @param array<array-key, mixed> $args
+         */
+        public function triggerEvent(string $eventName, array $args = []): void
+        {
+            if (self::$throw) {
+                throw new \RuntimeException('listener failed');
+            }
+            self::$events[] = ['name' => $eventName, 'args' => $args];
+        }
+    }
+}
+
 if (!function_exists('xoops_getHandler')) {
     /**
      * @return object{getUser?: callable, getByUser?: callable, getByDirname?: callable}
