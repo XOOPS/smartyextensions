@@ -76,27 +76,8 @@ final class TranslationExtension extends AbstractExtension
 
         $count = (array_key_exists('count', $params) && is_numeric($params['count'])) ? (int) $params['count'] : null;
 
-        $values = is_array($params['params'] ?? null) ? $params['params'] : [];
-        foreach ($params as $name => $value) {
-            if (!is_string($name) || in_array($name, self::RESERVED_PARAMS, true)) {
-                continue;
-            }
-            $values[$name] = $value;
-        }
-        // locale=/context= are reserved no-ops: parsed above only to be
-        // excluded from $values, never read or passed through.
-
-        $escape     = true;
-        $escapeFlag = $params['escape'] ?? null;
-        if (is_scalar($escapeFlag)) {
-            // Only a scalar is read. filter_var() would coerce a null to '',
-            // a RECOGNIZED false, and wrongly disable escaping; an object
-            // could throw while being converted and break rendering.
-            $validated = filter_var($escapeFlag, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            // An invalid/unrecognized value must never silently disable
-            // escaping: only an explicit, recognized false does.
-            $escape = null === $validated || $validated;
-        }
+        $values = $this->placeholderValues($params);
+        $escape = $this->escapeEnabled($params['escape'] ?? null);
         if ($escape) {
             $values = $this->escapeValues($values);
         }
@@ -118,6 +99,41 @@ final class TranslationExtension extends AbstractExtension
         }
 
         return $out;
+    }
+
+    /**
+     * Placeholder values of a tag: the params= array, then every attribute
+     * that is not reserved. locale= and context= are reserved no-ops: left
+     * out here, never read or passed through.
+     *
+     * @param array<array-key,mixed> $params
+     *
+     * @return array<array-key,mixed>
+     */
+    private function placeholderValues(array $params): array
+    {
+        $values = is_array($params['params'] ?? null) ? $params['params'] : [];
+        foreach ($params as $name => $value) {
+            if (is_string($name) && !in_array($name, self::RESERVED_PARAMS, true)) {
+                $values[$name] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * Read the escape= attribute: only an explicit, recognized false turns
+     * escaping off. An invalid or unrecognized value must never silently
+     * disable it.
+     */
+    private function escapeEnabled(mixed $flag): bool
+    {
+        // Only a scalar is read. filter_var() would coerce a null to '',
+        // a RECOGNIZED false, and wrongly disable escaping; an object
+        // could throw while being converted and break rendering.
+        return !is_scalar($flag)
+            || false !== filter_var($flag, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
     }
 
     /**
@@ -329,13 +345,10 @@ final class TranslationExtension extends AbstractExtension
         if (null === $value || is_scalar($value)) {
             return (string) $value;
         }
-        if (!($value instanceof \Stringable)) {
-            return '';
-        }
 
         try {
             // Called by name: static analysis does not see a cast as a throw point.
-            return $value->__toString();
+            return $value instanceof \Stringable ? $value->__toString() : '';
         } catch (\Throwable) {
             return '';
         }
