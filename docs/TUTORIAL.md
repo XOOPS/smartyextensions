@@ -996,7 +996,9 @@ modifier. On a page that is output-cached and shown in more than one language, w
 `<{nocache}>…<{/nocache}>` as above.
 
 **Escaping.** The translation itself is printed as it is, because translations may contain
-markup such as `<strong>`. The placeholder values are HTML-escaped, so `name=$author` is safe
+markup such as `<strong>`. That makes a catalog as trusted as a template: whoever can edit one
+can put markup, and with it script, on the page, so never load text that a visitor typed into a
+catalog. The placeholder values are HTML-escaped, so `name=$author` is safe
 with a name a visitor typed. The `default` text is escaped the same way, and a key without a
 translation is always printed escaped. Pass `escape=false` only when the placeholder values and
 `default` are already safe HTML. The result is HTML in every case, so an `assign`ed result is

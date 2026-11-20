@@ -306,7 +306,8 @@ the `core.i18n.missing` preload event and `file=` raises a deprecation notice.
 ```
 
 **Escaping.** The translated string is printed as it is, because translations may contain
-markup. What the template passes in is HTML-escaped: the placeholder values and `default`
+markup. A catalog is therefore as trusted as a template: never load text that a visitor typed
+into one. What the template passes in is HTML-escaped: the placeholder values and `default`
 (unless `escape=false`), and a key that does not resolve (always). The result is HTML, so print
 an `assign`ed result without escaping it again (`<{$title nofilter}>`, which also holds with
 Smarty's `$escape_html` on). A placeholder is not safe as a web address
