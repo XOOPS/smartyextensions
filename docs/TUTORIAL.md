@@ -840,7 +840,7 @@ Use the `xo_permission` block to conditionally show content:
 <{$value|sanitize_string_for_xml}>
 ```
 
-`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string. The accepted URL is returned HTML-escaped (`&` becomes `&amp;`, quotes become `&quot;`), ready to drop into an attribute — do not add `|escape` after it. The `nofilter` in the example keeps Smarty's `$escape_html` from escaping it a second time (`&amp;amp;`), and changes nothing on a site where that setting is off.
+`sanitize_url` allows these schemes: `http://`, `https://`, `ftp://`, `mailto:`, relative paths (`/path`, `page.html`), and hash fragments (`#section`). All other schemes (including `javascript:`, `data:`, and entity-encoded variants) are blocked and return an empty string. The accepted URL is returned HTML-escaped (`&` becomes `&amp;`, quotes become `&quot;`), ready to drop into an attribute — do not add `|escape` after it. The `nofilter` in the example keeps Smarty's `$escape_html` from escaping it a second time (`&amp;amp;`). It also skips, for that one output, any default modifiers and variable filters the site has registered; XOOPS itself registers none.
 
 `form_open`, `form_input` (`src`, `formaction`), `embed_pdf`, `render_breadcrumbs` and `render_pagination` apply the same scheme check: an unsafe `action` renders as `action=""`, an unsafe PDF URL renders nothing, an unsafe breadcrumb becomes plain text, and an unsafe pagination pattern links to `#`.
 
@@ -1002,7 +1002,8 @@ translation is always printed escaped. Pass `escape=false` only when the placeho
 `default` are already safe HTML. The result is HTML in every case, so an `assign`ed result is
 printed as it is: with `<{$title|escape}>` the visitor would read `&amp;` where the translation
 has `&amp;` for an ampersand. The `nofilter` in the example does the same on a site that has
-Smarty's `$escape_html` on, and changes nothing where it is off.
+Smarty's `$escape_html` on. It also skips, for that one output, any default modifiers and
+variable filters the site has registered; XOOPS itself registers none.
 
 Escaping makes a value safe as text and inside a quoted attribute that holds plain text, such
 as `title` or `alt`. It does not make a value safe as script or style: in an `onclick` or
