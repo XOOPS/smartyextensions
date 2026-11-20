@@ -16,10 +16,11 @@ use Xoops\SmartyExtensions\AbstractExtension;
  * ESCAPING (ADR-003) — deliberate exception to {@see AbstractExtension}'s
  * escape-on-direct-output contract: the resolved CATALOG STRING is always
  * emitted RAW (translated strings legitimately carry markup — 24
- * markup-bearing core constants, 99-Addendum §2.1); only the ad-hoc
- * PLACEHOLDER VALUES substituted into it are escaped (unless `escape=false`
- * is passed). The assigned value (`assign=`) is likewise raw per the
- * standing assign contract in {@see AbstractExtension}.
+ * markup-bearing core constants, 99-Addendum §2.1). What the TEMPLATE passes
+ * in is escaped: the ad-hoc PLACEHOLDER VALUES and the `default=` text
+ * (unless `escape=false` is passed), and a KEY that does not resolve
+ * (always). The result is therefore HTML in every case, and the assigned
+ * value (`assign=`) is that same HTML: print it without escaping it again.
  *
  * @copyright (c) 2000-2026 XOOPS Project (https://xoops.org)
  * @license   GNU GPL 2 (https://www.gnu.org/licenses/gpl-2.0.html)
@@ -72,9 +73,6 @@ final class TranslationExtension extends AbstractExtension
         }
 
         $dirname = $this->toAttributeString($params['dirname'] ?? '');
-        if ('' === $dirname && ($GLOBALS['xoopsModule'] ?? null) instanceof \XoopsModule) {
-            $dirname = $this->toAttributeString($GLOBALS['xoopsModule']->getVar('dirname', 'n'));
-        }
 
         $count = (array_key_exists('count', $params) && is_numeric($params['count'])) ? (int) $params['count'] : null;
 
@@ -103,18 +101,14 @@ final class TranslationExtension extends AbstractExtension
             $values = $this->escapeValues($values);
         }
 
-        if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
-            $out = \Xmf\I18n\Translation::translate($dirname, $key, $values, $domain, $count);
-        } else {
-            $out = $this->constantFallback($key, $values);
-        }
-
-        if ($out === $key && $this->debug) {
-            $this->fireMissingEvent($dirname, $domain, $key);
-        }
-
-        if ($out === $key && array_key_exists('default', $params)) {
-            $out = $this->toAttributeString($params['default']);
+        $out = $this->lookup($key, $dirname, $domain, $values, $count);
+        if (null === $out) {
+            if (array_key_exists('default', $params)) {
+                $default = $this->toAttributeString($params['default']);
+                $out     = $escape ? $this->escape($default) : $default;
+            } else {
+                $out = $this->escape($key);
+            }
         }
 
         if (!empty($params['assign']) && method_exists($template, 'assign')) {
@@ -127,17 +121,14 @@ final class TranslationExtension extends AbstractExtension
     }
 
     /**
-     * Same runtime as {@see xoTrans()}, no params, no escaping, no default.
+     * Same lookup as {@see xoTrans()}, without placeholders and without a
+     * default. A key that does not resolve is returned HTML-escaped.
      *
      * Usage: <{"_MD_X"|xoTrans:'news'}>
      */
     public function xoTransModifier(string $key, string $dirname = '', string $domain = 'main'): string
     {
-        if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
-            return \Xmf\I18n\Translation::translate($dirname, $key, [], $domain);
-        }
-
-        return $this->constantFallback($key, []);
+        return $this->lookup($key, $dirname, $domain) ?? $this->escape($key);
     }
 
     /**
@@ -200,6 +191,47 @@ final class TranslationExtension extends AbstractExtension
     }
 
     /**
+     * The one lookup behind the tag and the modifier: the translation, or
+     * null when the key does not resolve. An empty $dirname means the current
+     * module; a miss is reported in debug mode.
+     *
+     * @param array<array-key,mixed> $values
+     */
+    private function lookup(string $key, string $dirname, string $domain, array $values = [], ?int $count = null): ?string
+    {
+        if ('' === $dirname && ($GLOBALS['xoopsModule'] ?? null) instanceof \XoopsModule) {
+            $dirname = $this->toAttributeString($GLOBALS['xoopsModule']->getVar('dirname', 'n'));
+        }
+
+        if (class_exists(\Xmf\I18n\Translation::class) && \Xmf\I18n\Translation::isInitialized()) {
+            $out = \Xmf\I18n\Translation::translate($dirname, $key, $values, $domain, $count);
+            // The engine returns the key on a miss, and a translation may be
+            // the same text as its key: only then is the engine asked.
+            if ($out === $key && !$this->engineResolves($dirname, $key, $domain)) {
+                $out = null;
+            }
+        } else {
+            $out = $this->constantFallback($key, $values);
+        }
+
+        if (null === $out && $this->debug) {
+            $this->fireMissingEvent($dirname, $domain, $key);
+        }
+
+        return $out;
+    }
+
+    private function engineResolves(string $dirname, string $key, string $domain): bool
+    {
+        try {
+            return true === \Xmf\I18n\Translation::getInstance()?->explain($dirname, $key, $domain)->found();
+        } catch (\Throwable) {
+            // translate() already swallowed the same failure and returned the key.
+            return false;
+        }
+    }
+
+    /**
      * Legacy-constant degrade path used only when the Xmf\I18n engine is
      * absent or uninitialised. Stricter than
      * {@see XoopsCoreExtension::translate()}, which resolves any defined
@@ -207,18 +239,18 @@ final class TranslationExtension extends AbstractExtension
      * here — never an arbitrary one (XOOPS_DB_PASS, XOOPS_ROOT_PATH, …).
      *
      * @param array<array-key,mixed> $values
+     *
+     * @return string|null null when $key is not a defined string language constant
      */
-    private function constantFallback(string $key, array $values): string
+    private function constantFallback(string $key, array $values): ?string
     {
         // \z (not $) so a trailing newline in $key cannot slip past the anchor.
         if (1 !== preg_match('/^_[A-Z][A-Z0-9_]*\z/', $key) || !defined($key)) {
-            return $key;
+            return null;
         }
         $value = constant($key);
         if (!is_string($value)) {
-            // Returned as it is, without placeholders, so the caller still
-            // sees a miss and can apply default= and report it.
-            return $key;
+            return null;
         }
 
         $map = [];
@@ -259,7 +291,7 @@ final class TranslationExtension extends AbstractExtension
                 continue;
             }
             try {
-                $out[$name] = htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $out[$name] = $this->escape((string) $value);
             } catch (\Throwable) {
                 // A throwing Stringable::__toString() must never break
                 // rendering. The value is dropped, not passed on: a second
@@ -269,6 +301,11 @@ final class TranslationExtension extends AbstractExtension
         }
 
         return $out;
+    }
+
+    private function escape(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     private function stringify(mixed $value): string
@@ -289,12 +326,16 @@ final class TranslationExtension extends AbstractExtension
      */
     private function toAttributeString(mixed $value): string
     {
-        if (null !== $value && !is_scalar($value) && !($value instanceof \Stringable)) {
+        if (null === $value || is_scalar($value)) {
+            return (string) $value;
+        }
+        if (!($value instanceof \Stringable)) {
             return '';
         }
 
         try {
-            return (string) $value;
+            // Called by name: static analysis does not see a cast as a throw point.
+            return $value->__toString();
         } catch (\Throwable) {
             return '';
         }

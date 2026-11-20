@@ -12,8 +12,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`TranslationExtension`** — the `xoTrans` function (aliases `trans`, `xoT`) and the `xoTrans`
   modifier, for the XMF 1.5 translation engine (`Xmf\I18n\Translation`). Without the engine a key
   that is a language constant (`_MI_X`) is resolved from the constant; no other constant can be
-  read through it. The translated string is printed as it is, placeholder values are HTML-escaped
-  unless `escape=false`. XMF is not a requirement of this package. First shipped inside
+  read through it. The translated string is printed as it is; placeholder values and `default`
+  are HTML-escaped unless `escape=false`, and a key that does not resolve is always escaped.
+  XMF is not a requirement of this package. First shipped inside
   XOOPS 2.8.0 Alpha1 as an unpublished 1.4.0. Differences from that copy: the Smarty 4 path
   registers the functions non-cacheable, like every other extension since 2.0.0 Beta1;
   placeholder values in nested arrays are escaped at every depth; a value whose string
@@ -21,8 +22,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   key that does not resolve, so `default` and the debug-mode `core.i18n.missing` event still
   apply; that event also fires on sites without XMF; the constant fallback fills all
   placeholders in one pass, so a `{token}` inside a value is not replaced again; a collision
-  notice that an error handler turns into an exception no longer stops Smarty 4 registration.
-  - `tests/Unit/Extension/TranslationExtensionTest.php` — 54 tests.
+  notice that an error handler turns into an exception no longer stops Smarty 4 registration;
+  `default` and an unresolved key are escaped, where that copy printed them as they are; a
+  translation that is the same text as its key is no longer taken for a missing one; the
+  modifier reads the catalog of the current module when no module is named, and reports a
+  missing key in debug mode, as the tag does.
+  - `tests/Unit/Extension/TranslationExtensionTest.php` — 60 tests.
   - `docs/TUTORIAL.md` — "Translation tags".
 
 ---

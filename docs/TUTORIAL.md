@@ -978,14 +978,15 @@ constant (`_MI_NEWS_TITLE`) is read from the constant, so the same template work
 <{* Plural form by number; catalog of another module and domain *}>
 <{xoTrans key="comments.count" count=$total dirname="news" domain="blocks"}>
 
-<{* Store the result instead of printing it *}>
+<{* Store the result instead of printing it. It is finished HTML: do not escape it again *}>
 <{nocache}>
 <{xoTrans key="_MI_NEWS_TITLE" assign="title"}>
-<title><{$title|escape}></title>
+<h2><{$title nofilter}></h2>
 <{/nocache}>
 ```
 
-The modifier form takes no placeholders: `<{"_MD_NEWS_MORE"|xoTrans:'news'}>`.
+The modifier form takes no placeholders: `<{"_MD_NEWS_MORE"|xoTrans:'news'}>`. Without a module
+name it reads the catalog of the current module, as the tag does.
 
 **Output caching.** The tag runs again for every visitor, also on a cached page, so each one
 gets their own language. Two forms do not: the tags that read an `assign`ed result, and the
@@ -994,9 +995,20 @@ modifier. On a page that is output-cached and shown in more than one language, w
 
 **Escaping.** The translation itself is printed as it is, because translations may contain
 markup such as `<strong>`. The placeholder values are HTML-escaped, so `name=$author` is safe
-with a name a visitor typed. Pass `escape=false` only for a value that is already safe HTML.
-A key without a translation is printed as it is, and so is `default`: never pass visitor input
-as `key` or `default`.
+with a name a visitor typed. The `default` text is escaped the same way, and a key without a
+translation is always printed escaped. Pass `escape=false` only when the placeholder values and
+`default` are already safe HTML. The result is HTML in every case, so an `assign`ed result is
+printed as it is: with `<{$title|escape}>` the visitor would read `&amp;` where the translation
+has `&amp;` for an ampersand. The `nofilter` in the example does the same on a site that has
+Smarty's `$escape_html` on, and changes nothing where it is off.
+
+Escaping makes a value safe as text and inside a quoted attribute. It does not make a web
+address safe: `javascript:alert(1)` has nothing to escape. Keep addresses out of the translated
+text and write the link in the template:
+
+```smarty
+<a href="<{$url|sanitize_url}>"><{xoTrans key="_MI_NEWS_MORE"}></a>
+```
 
 Unlike `translate`, these tags read only language constants (`_UPPER_CASE` names), never
 another constant.

@@ -34,12 +34,16 @@ if (!class_exists(Translation::class, false)) {
         /** @var list<array{dirname: string, key: string, params: array<array-key, mixed>, domain: string, count: int|null}> */
         public static array $calls = [];
 
+        /** When true, explain() throws, as the real resolver can (an invalid dirname). */
+        public static bool $explainThrows = false;
+
         public static function reset(): void
         {
-            self::$initialized = false;
-            self::$tag         = 'en_US';
-            self::$catalog     = [];
-            self::$calls       = [];
+            self::$initialized   = false;
+            self::$tag           = 'en_US';
+            self::$catalog       = [];
+            self::$calls         = [];
+            self::$explainThrows = false;
         }
 
         public static function isInitialized(): bool
@@ -88,6 +92,32 @@ if (!class_exists(Translation::class, false)) {
         public function context(): LocaleContext
         {
             return new LocaleContext(self::$tag);
+        }
+
+        /** As the real engine: resolves without translating and without a call to the listener. */
+        public function explain(string $dirname, string $key, string $domain = 'main'): Catalog\Resolution
+        {
+            if (self::$explainThrows) {
+                throw new \RuntimeException('Invalid dirname component: ' . $dirname);
+            }
+
+            return new Catalog\Resolution(isset(self::$catalog[$key]));
+        }
+    }
+}
+
+namespace Xmf\I18n\Catalog;
+
+if (!class_exists(Resolution::class, false)) {
+    final class Resolution
+    {
+        public function __construct(private readonly bool $found)
+        {
+        }
+
+        public function found(): bool
+        {
+            return $this->found;
         }
     }
 }

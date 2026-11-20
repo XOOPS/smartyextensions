@@ -23,6 +23,7 @@ final class TranslationExtensionTest extends TestCase
         \defined('_SE_TR_PLAIN') || \define('_SE_TR_PLAIN', 'Plain');
         \defined('_SE_TR_NUMBER') || \define('_SE_TR_NUMBER', 42);
         \defined('SE_TR_SECRET') || \define('SE_TR_SECRET', 'not a language constant');
+        \defined('_SE_TR_SAME') || \define('_SE_TR_SAME', '_SE_TR_SAME');
     }
 
     protected function setUp(): void
@@ -484,7 +485,7 @@ final class TranslationExtensionTest extends TestCase
     }
 
     #[Test]
-    public function debugModeReportsAMissingKeyWithEmptyLocaleWithoutTheEngine(): void
+    public function debugModeReportsAMissingKeyWithEmptyLocaleWhenTheEngineIsNotInitialised(): void
     {
         $ext = new TranslationExtension(true);
 
@@ -513,6 +514,62 @@ final class TranslationExtensionTest extends TestCase
         $this->assertSame('_SE_TR_UNDEFINED', $out);
     }
 
+    #[Test]
+    public function aTranslationEqualToItsKeyIsNotAMiss(): void
+    {
+        $ext = new TranslationExtension(true);
+
+        $this->assertSame('_SE_TR_SAME', $ext->xoTrans(['key' => '_SE_TR_SAME', 'default' => 'News'], $this->tpl()));
+
+        Translation::$initialized = true;
+        Translation::$catalog     = ['Save' => 'Save'];
+
+        $this->assertSame('Save', $ext->xoTrans(['key' => 'Save', 'default' => 'News'], $this->tpl()));
+        $this->assertSame('Save', $ext->xoTransModifier('Save'));
+        $this->assertSame([], \XoopsPreload::$events);
+    }
+
+    #[Test]
+    public function aKeyTheEngineCannotExplainIsAMiss(): void
+    {
+        Translation::$initialized   = true;
+        Translation::$explainThrows = true;
+        Translation::$catalog       = ['Save' => 'Save'];
+
+        $this->assertSame('News', $this->ext->xoTrans(['key' => 'Save', 'default' => 'News'], $this->tpl()));
+    }
+
+    #[Test]
+    public function aKeyThatDoesNotResolveIsEscaped(): void
+    {
+        $key = '<b>"a"</b>';
+        $esc = '&lt;b&gt;&quot;a&quot;&lt;/b&gt;';
+
+        $this->assertSame($esc, $this->ext->xoTrans(['key' => $key], $this->tpl()));
+        $this->assertSame($esc, $this->ext->xoTrans(['key' => $key, 'escape' => false], $this->tpl()));
+        $this->assertSame($esc, $this->ext->xoTransModifier($key));
+
+        Translation::$initialized = true;
+
+        $this->assertSame($esc, $this->ext->xoTrans(['key' => $key], $this->tpl()));
+        $this->assertSame($esc, $this->ext->xoTransModifier($key));
+        // The engine is asked for the key as the template wrote it.
+        $this->assertSame([$key, $key], \array_column(Translation::$calls, 'key'));
+    }
+
+    #[Test]
+    public function defaultIsEscapedUnlessEscapeIsFalse(): void
+    {
+        $params = ['key' => '_SE_TR_UNDEFINED', 'default' => '<em>R&D</em>'];
+
+        $this->assertSame('&lt;em&gt;R&amp;D&lt;/em&gt;', $this->ext->xoTrans($params, $this->tpl()));
+        $this->assertSame('<em>R&D</em>', $this->ext->xoTrans($params + ['escape' => false], $this->tpl()));
+        $this->assertSame(
+            '&lt;em&gt;R&amp;D&lt;/em&gt;',
+            $this->ext->xoTrans($params + ['escape' => 'not-a-boolean'], $this->tpl()),
+        );
+    }
+
     // ──────────────────────────────────────────────
     // Modifier
     // ──────────────────────────────────────────────
@@ -534,6 +591,37 @@ final class TranslationExtensionTest extends TestCase
         $this->assertSame(
             [['dirname' => 'news', 'key' => 'k', 'params' => [], 'domain' => 'admin', 'count' => null]],
             Translation::$calls,
+        );
+    }
+
+    #[Test]
+    public function modifierDirnameComesFromTheCurrentModuleUnlessGiven(): void
+    {
+        Translation::$initialized = true;
+        $GLOBALS['xoopsModule']   = new \XoopsModule(['dirname' => 'publisher']);
+
+        $this->ext->xoTransModifier('k');
+        $this->ext->xoTransModifier('k', 'news');
+
+        $this->assertSame(['publisher', 'news'], \array_column(Translation::$calls, 'dirname'));
+    }
+
+    #[Test]
+    public function modifierReportsAMissingKeyInDebugModeOnly(): void
+    {
+        Translation::$initialized = true;
+        Translation::$tag         = 'fr_FR';
+
+        $this->ext->xoTransModifier('news.gone', 'news', 'admin');
+        $this->assertSame([], \XoopsPreload::$events);
+
+        (new TranslationExtension(true))->xoTransModifier('news.gone', 'news', 'admin');
+        $this->assertSame(
+            [[
+                'name' => 'core.i18n.missing',
+                'args' => [['dirname' => 'news', 'domain' => 'admin', 'key' => 'news.gone', 'locale' => 'fr_FR']],
+            ]],
+            \XoopsPreload::$events,
         );
     }
 

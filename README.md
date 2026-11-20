@@ -294,7 +294,7 @@ the `core.i18n.missing` preload event and `file=` raises a deprecation notice.
 | `params` | Array of placeholder values |
 | `default` | Text to use when the key does not resolve |
 | `assign` | Template variable to store the result in, instead of printing it |
-| `escape` | `false` passes placeholder values unescaped |
+| `escape` | `false` passes placeholder values and `default` unescaped |
 | any other | A placeholder value: `name=$author` fills `{name}` |
 
 ```smarty
@@ -305,8 +305,11 @@ the `core.i18n.missing` preload event and `file=` raises a deprecation notice.
 ```
 
 **Escaping.** The translated string is printed as it is, because translations may contain
-markup. Only the placeholder values are HTML-escaped. A key that does not resolve is printed
-as it is too, and so is `default`: do not pass visitor input as `key` or `default`.
+markup. What the template passes in is HTML-escaped: the placeholder values and `default`
+(unless `escape=false`), and a key that does not resolve (always). The result is HTML, so print
+an `assign`ed result without escaping it again (`<{$title nofilter}>`, which also holds with
+Smarty's `$escape_html` on). A placeholder is not safe as a web address
+(`href="{url}"` in a translation): keep links in the template and use `sanitize_url` there.
 
 On Smarty 5, call `TranslationExtension::probeCollisions($smarty)` before `registerAll()`: it lists
 the tag names another extension already answers, since Smarty uses the first match without a warning.
