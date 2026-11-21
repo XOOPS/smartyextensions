@@ -962,6 +962,12 @@ The `translate` modifier looks up a XOOPS language constant:
 <h1><{"_MI_NEWS_TITLE"|translate}></h1>
 ```
 
+It reads only language constants, which are `_UPPER_CASE` names. Any other name, such as
+`XOOPS_DB_PASS`, is printed as it is, so a title from the database cannot make the modifier
+print another constant. The modifier does not escape HTML: add `|escape` when the value comes
+from the database (`<{$block.title|translate|escape}>`). For a constant with another name, write
+`<{$smarty.const.NAME}>`.
+
 ### Translation tags
 
 `xoTrans` translates a key through the XMF translation engine (XMF 1.5 and later). `trans` and
@@ -1017,7 +1023,7 @@ translated text and write the link in the template:
 <a href="<{$url|sanitize_url nofilter}>"><{xoTrans key="_MI_NEWS_MORE"}></a>
 ```
 
-Unlike `translate`, these tags read only language constants (`_UPPER_CASE` names), never
+Like `translate`, these tags read only language constants (`_UPPER_CASE` names), never
 another constant.
 
 ### Debug output

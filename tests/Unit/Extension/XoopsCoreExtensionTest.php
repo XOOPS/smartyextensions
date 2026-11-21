@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Xoops\SmartyExtensions\Test\Unit\Extension;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Xoops\SmartyExtensions\Extension\XoopsCoreExtension;
@@ -337,6 +338,37 @@ final class XoopsCoreExtensionTest extends TestCase
             \define('_MI_TEST_XOOPS_CORE_EXT2', 'Defined Value');
         }
         $this->assertSame('Defined Value', $this->ext->translate('_MI_TEST_XOOPS_CORE_EXT2', 'Fallback'));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function namesThatAreNotLanguageConstants(): array
+    {
+        return [
+            'no leading underscore' => ['SE_CORE_TR_SECRET'],
+            'PHP constant'          => ['PHP_VERSION'],
+            'lower case'            => ['_se_core_tr_lower'],
+            'trailing newline'      => ["_SE_CORE_TR_PLAIN\n"],
+            'class constant syntax' => [self::class . '::SECRET'],
+        ];
+    }
+
+    public const SECRET = 'class-secret';
+
+    #[Test]
+    #[DataProvider('namesThatAreNotLanguageConstants')]
+    public function translateReadsOnlyLanguageConstants(string $name): void
+    {
+        foreach (['SE_CORE_TR_SECRET' => 'secret', '_se_core_tr_lower' => 'lower', '_SE_CORE_TR_PLAIN' => 'Plain'] as $constant => $value) {
+            if (!\defined($constant)) {
+                \define($constant, $value);
+            }
+        }
+
+        $this->assertSame('Plain', $this->ext->translate('_SE_CORE_TR_PLAIN'));
+        $this->assertSame($name, $this->ext->translate($name));
+        $this->assertSame('Fallback', $this->ext->translate($name, 'Fallback'));
     }
 
     // ──────────────────────────────────────────────

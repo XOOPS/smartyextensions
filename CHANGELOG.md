@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **`translate`** — the modifier reads only language constants (`_UPPER_CASE` names such as
+  `_MI_NEWS_TITLE`). Before, it returned the value of any defined constant, so a value from the
+  database that was passed through it (a block or menu title) could name `XOOPS_DB_PASS` or a
+  class constant and print it. Another name now gives the `default` argument, or the name itself.
+  **Breaking** for a template that used the modifier with a constant of another name
+  (`AM_MYMODULE_TITLE`, `_MI_mymodule_title`): write `<{$smarty.const.AM_MYMODULE_TITLE}>` there.
+
 ---
 
 ## [2.0.0 Beta2] — 2026-11-21
