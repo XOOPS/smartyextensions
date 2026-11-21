@@ -249,10 +249,9 @@ final class TranslationExtension extends AbstractExtension
 
     /**
      * Legacy-constant degrade path used only when the Xmf\I18n engine is
-     * absent or uninitialized. Stricter than
-     * {@see XoopsCoreExtension::translate()}, which resolves any defined
-     * constant: only underscore-prefixed language constants are resolvable
-     * here — never an arbitrary one (XOOPS_DB_PASS, XOOPS_ROOT_PATH, …).
+     * absent or uninitialized. Like {@see XoopsCoreExtension::translate()},
+     * it reads only language constants ({@see self::isLanguageConstant()}) —
+     * never an arbitrary one (XOOPS_DB_PASS, XOOPS_ROOT_PATH, …).
      *
      * @param array<array-key,mixed> $values
      *
@@ -260,8 +259,7 @@ final class TranslationExtension extends AbstractExtension
      */
     private function constantFallback(string $key, array $values): ?string
     {
-        // \z (not $) so a trailing newline in $key cannot slip past the anchor.
-        if (1 !== preg_match('/^_[A-Z][A-Z0-9_]*\z/', $key) || !defined($key)) {
+        if (!self::isLanguageConstant($key)) {
             return null;
         }
         $value = constant($key);

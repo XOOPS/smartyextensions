@@ -257,7 +257,7 @@ Wrappers around XOOPS globals and handlers.
 | `xo_render_menu` | function | Module admin menu as Bootstrap nav |
 | `xo_avatar` | function | User avatar (XOOPS upload or Gravatar fallback) |
 | `xo_debug` | function | Dump variable (only outputs when `debug_mode` is active) |
-| `translate` | modifier | Resolve XOOPS language constant with string fallback |
+| `translate` | modifier | Resolve a XOOPS language constant (`_UPPER_CASE` name only) with string fallback |
 
 ```smarty
 <{xo_get_config name="sitename" assign="siteName"}>
