@@ -87,7 +87,7 @@ PHPStan runs at level `max` over `src/` with `phpstan-baseline.neon`. New code m
 
 - **GitHub Actions:** PHP 8.2 (plus lowest deps), 8.3, 8.4, 8.5. Each run: `composer validate`, lint (non-blocking), analyse, test.
 - **Coverage:** PHP 8.3 with Xdebug, uploaded to Codecov.
-- **Also:** SonarCloud (automatic analysis), Scrutinizer, CodeRabbit. The `sonarcloud.yml` and `qodana.yml` workflow jobs are guarded to `XOOPS/xmf` and skip here.
+- **Also:** SonarCloud (automatic analysis, configured in `.sonarcloud.properties`; no workflow), Scrutinizer, CodeRabbit. The `qodana.yml` workflow job is guarded to `XOOPS/xmf` and skips here.
 
 ## Pull Request Checklist
 
