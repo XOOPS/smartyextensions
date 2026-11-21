@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased]
+## [2.0.0 Beta2] — 2026-11-21
 
 ### Added
 
@@ -244,6 +244,7 @@ First stable release of the 1.3 line. Existing plugin behaviour is unchanged sin
 
 ---
 
+[2.0.0 Beta2]: https://github.com/XOOPS/smartyextensions/compare/v2.0.0-Beta1...v2.0.0-Beta2
 [2.0.0 Beta1]: https://github.com/XOOPS/smartyextensions/compare/v1.3.0...v2.0.0-Beta1
 [1.2.0]: https://github.com/mambax7/smartyextensions/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mambax7/smartyextensions/releases/tag/v1.1.0
